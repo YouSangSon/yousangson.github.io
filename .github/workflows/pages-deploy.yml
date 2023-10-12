@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - main
-      - master
     paths-ignore:
       - .gitignore
       - README.md
@@ -42,8 +41,13 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3
-          bundler-cache: true
+          ruby-version: 3.3.0
+          bundler-cache: false
+      
+      - name: Install dependencies
+        run: |
+          gem install bundler
+          bundle install
 
       - name: Build site
         run: bundle exec jekyll b -d "_site${{ steps.pages.outputs.base_path }}"
