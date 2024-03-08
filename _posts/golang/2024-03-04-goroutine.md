@@ -30,7 +30,7 @@ tags: [golang, goroutine, concurrency] # TAG names should always be lowercase
 
 ### 고루틴(goroutine)이란?
 
-* 고루틴은 Golang 런타임에 의해 관리되는 동시성 프로그래밍을 위한 경량 **[스레드]("https://yousangson.github.io/posts/thread/")** 을 의미합니다.  
+* 고루틴은 Golang 런타임에 의해 관리되는 동시성 프로그래밍을 위한 경량 **[스레드]("/_posts/computer_science/thread/2024-03-05-thread.md")** 을 의미합니다.  
 * 스케줄러는 M:N 스케줄링을 사용하여 M개의 고루틴을 N개의 OS 스레드에 매핑합니다.  
 * 고채널을 통해 고루틴간의 통신을 할 수 있습니다.
 
