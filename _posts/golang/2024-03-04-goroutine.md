@@ -1,6 +1,6 @@
 ---
 title: 고루틴(goroutine)에 알아보자
-categories: [Golang, Thread, Concurrency]
+categories: [golang, goroutine]
 tags: [golang, goroutine, concurrency] # TAG names should alw   ays be lowercase
 ---
 
