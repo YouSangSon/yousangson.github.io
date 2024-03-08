@@ -1,25 +1,7 @@
 ---
-title: [Golang]고루틴(goroutine)에 알아보자
+title: 고루틴(goroutine)에 알아보자
 categories: [Golang, Thread, Concurrency]
-tags: [golang, goroutine, concurrency] # TAG names should always be lowercase
----
-
----
-
-### 참고
-
-<details>
-<summary>접기 / 펼치기</summary>
-
-* <https://go.dev/doc/effective_go#goroutines>
-* <https://deku.posstree.com/ko/golang/goroutine/>
-* <https://judo0179.tistory.com/88>
-* <https://jokerkwu.tistory.com/184>
-* Chat GPT
-* Gemini
-
-</details>
-
+tags: [golang, goroutine, concurrency] # TAG names should alw   ays be lowercase
 ---
 
 ### 서론
@@ -77,3 +59,14 @@ tags: [golang, goroutine, concurrency] # TAG names should always be lowercase
 자동 관리|Go 런타임|가상 스레드 풀|코루틴 라이브러리|asyncio 라이브러리
 호환성|Go 코드만|기존 자바 코드와 호환|코틀린 코드만|파이썬 3.5 이상
 제약|없음|데몬 스레드만 가능|일부 기능 제한 (예: Java NIO)|  
+
+---
+
+### 참고
+
+* <https://go.dev/doc/effective_go#goroutines>
+* <https://deku.posstree.com/ko/golang/goroutine/>
+* <https://judo0179.tistory.com/88>  
+* <https://jokerkwu.tistory.com/184>    
+* Chat GPT  
+* Gemini
