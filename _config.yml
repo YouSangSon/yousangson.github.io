@@ -12,7 +12,7 @@ lang: en
 timezone: Asia/Seoul
 
 # jekyll-seo-tag settings › https://github.com/jekyll/jekyll-seo-tag/blob/master/docs/usage.md
-# ↓ --------------------------
+# ↓ -------------------------
 
 title: ys_blog # the main title
 
@@ -40,7 +40,7 @@ social:
     # The first element serves as the copyright owner's link
     # - https://twitter.com/username # change to your twitter homepage
     - https://github.com/YouSangSon # change to your github homepage
-    # - https://www.linkedin.com/in/%EC%9C%A0%EC%83%81-%EC%86%90-75869324a/
+    - https://www.linkedin.com/in/유상-손-75869324a
     # Uncomment below to add more social links
     # - https://www.facebook.com/username
 
@@ -63,7 +63,7 @@ google_analytics:
 #     light  - Use the light color scheme
 #     dark   - Use the dark color scheme
 #
-theme_mode: # [light|dark]
+theme_mode: [light|dark]
 
 # The CDN endpoint for images.
 # Notice that once it is assigned, the CDN url

@@ -18,7 +18,7 @@ tags: [golang, goroutine, concurrency] # TAG names should alw   ays be lowercase
 
 > <span style='color:orange'>Go에서 실행되는 모든 프로그램들은 고루틴에서 실행됩니다.</span> (메인 함수도 고루틴에서 실행이 됩니다. 메인 고루틴이 종료하게 되면 즉시 다른 고루틴들이 종료됩니다.)  
 
-<span style='color:yellow'>주의할 점</span>
+<span style='color: hsl(0, 100%, 70%);'>주의할 점</span>
 
 > CPU의 스레드와 OS 영역에서 다뤄지는 스레드는 서로 지칭하는 대상이 다릅니다.  
 > <span style='color:orange'>CPU의 스레드는 한개의 코어를 OS에게 여러개로 인식시켜 동작하도록 하는 하드웨어 영역의 개념</span>이고, 고루틴에서 사용하는 스레드는 OS 영역에서 다뤄지는 스레드로 OS 하위의 소프트웨어 영역에서 CPU의 작업단위로 지칭되는 용어입니다.
@@ -31,7 +31,7 @@ tags: [golang, goroutine, concurrency] # TAG names should alw   ays be lowercase
 - 많은 수의 고루틴을 실행하여 높은 동시성를 유지한다.
 - N 코어 머신에서, N 개의 고루틴을 병렬하게 동작시킨다.
 
-<span style='color:yellow'>주의할 점</span>
+<span style='color: hsl(0, 100%, 70%);'>주의할 점</span>
 
 > 동시성과 병렬성은 서로 비슷한 개념이라고 생각할 수 있지만 명확히 다른 개념이다.  
 > <span style='color:orange'>동시성은 싱글 코어에서 멀티 스레드를 동작시키는 논리적인 개념</span>으로 한번에 여러개가 동시에 실행되는 것 처럼 보이게 된다.  
