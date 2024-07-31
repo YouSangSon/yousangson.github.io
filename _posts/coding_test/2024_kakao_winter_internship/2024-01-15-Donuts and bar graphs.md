@@ -2,6 +2,9 @@
 title: 도넛과 막대 그래프
 categories: [coding test, 2024 kakao winter internship]
 tags: [coding test, 2024 kakao winter internship] # TAG names should always be lowercase
+sitemap:
+  changefreq: daily
+  priority: 1.0
 ---
 
 ## 출처 [프로그래머스](https://school.programmers.co.kr/learn/courses/30/lessons/258711)

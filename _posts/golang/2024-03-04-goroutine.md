@@ -2,6 +2,9 @@
 title: 고루틴(goroutine)에 알아보자
 categories: [golang, goroutine]
 tags: [golang, goroutine, concurrency] # TAG names should alw   ays be lowercase
+sitemap:
+  changefreq: daily
+  priority: 1.0
 ---
 
 ### 서론
