@@ -131,6 +131,8 @@ collections:
   tabs:
     output: true
     sort_by: order
+  posts:
+    output: true
 
 defaults:
   - scope:
