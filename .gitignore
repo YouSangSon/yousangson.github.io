@@ -23,6 +23,7 @@ package-lock.json
 !.vscode/tasks.json
 
 # Misc
+.playwright-mcp/
 
 # ETC
 .DS_Store

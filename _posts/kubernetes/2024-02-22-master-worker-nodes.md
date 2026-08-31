@@ -1,3 +1,11 @@
+---
+title: Kubernetes 마스터 노드와 워커 노드 구조
+description: 쿠버네티스 클러스터의 마스터/워커 노드 역할과 주요 컴포넌트 설명
+categories: [kubernetes]
+tags: [kubernetes, master node, worker node, k8s]
+date: 2024-02-22
+---
+
 쿠버네티스에서 마스터와 워커 노드(예전에는 '슬레이브'라고 불렸지만 현재는 이 용어를 지양합니다)의 구조에 대해 설명드리겠습니다.
 
 1. 클러스터 구조의 이유:

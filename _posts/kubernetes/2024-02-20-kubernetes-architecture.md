@@ -1,3 +1,11 @@
+---
+title: Kubernetes 환경 아키텍처 면접 질문 정리
+description: 쿠버네티스 클러스터 구조, 컴포넌트, 고가용성, 네트워킹, 스토리지 관련 면접 질문과 답변
+categories: [kubernetes]
+tags: [kubernetes, k8s, architecture, interview]
+date: 2024-02-20
+---
+
 네, Kubernetes 환경 아키텍처에 대한 질문은 매우 중요한 주제입니다. 다음과 같은 질문들이 나올 수 있으며, 이에 대한 답변을 준비해 드리겠습니다:
 
 1. Kubernetes 클러스터의 기본 구조에 대해 설명해주세요.

@@ -1,3 +1,11 @@
+---
+title: 헥사고날 아키텍처로 Spring Security + JWT 로그인 구현하기
+description: Kotlin과 Spring Security, JWT를 활용한 헥사고날 아키텍처 기반 인증 시스템 구현
+categories: [architecture, spring]
+tags: [hexagonal, spring security, jwt, kotlin]
+date: 2024-03-01
+---
+
 헥사고날 아키텍처를 사용하여 Spring Security, JWT, 그리고 Kotlin으로 일반 로그인을 구현하는 예시 코드를 제공해드리겠습니다. 이 구현은 다음과 같은 구조를 가집니다:
 
 1. Domain Layer

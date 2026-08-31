@@ -1,3 +1,11 @@
+---
+title: DTO vs Entity vs 기타 클래스 정리
+description: Spring Boot에서 DTO, Entity, 서비스 클래스의 역할과 차이점
+categories: [spring boot]
+tags: [spring boot, dto, entity, kotlin]
+date: 2024-03-07
+---
+
 ### DTO vs 엔티티 vs 기타 클래스
 
 1. **DTO (Data Transfer Object)**:

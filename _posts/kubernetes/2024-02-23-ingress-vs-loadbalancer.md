@@ -1,4 +1,12 @@
-* 면접 떄 물어봤던 것
+---
+title: Kubernetes Ingress vs 로드밸런서 차이점
+description: Ingress와 로드밸런서의 차이점, 계층, 기능, 사용 사례 비교
+categories: [kubernetes]
+tags: [kubernetes, ingress, load balancer, k8s]
+date: 2024-02-23
+---
+
+> 면접 때 물어봤던 것
 
 Ingress와 로드밸런싱은 둘 다 트래픽을 관리하는 데 사용되지만, 그 목적과 기능에 차이가 있습니다. 이 둘의 주요 차이점을 설명해 드리겠습니다:
 

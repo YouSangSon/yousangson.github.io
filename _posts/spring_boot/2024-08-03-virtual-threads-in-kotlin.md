@@ -1,3 +1,11 @@
+---
+title: Spring Boot에서 가상 스레드와 코루틴 함께 사용하기
+description: Java 21 가상 스레드와 Kotlin 코루틴을 Spring Boot에서 통합하는 방법
+categories: [spring boot, kotlin]
+tags: [spring boot, virtual thread, coroutine, kotlin, java21]
+date: 2024-08-03
+---
+
 1. Spring Boot 설정:
 
 application.yml 또는 application.properties에서 가상 스레드를 활성화합니다:

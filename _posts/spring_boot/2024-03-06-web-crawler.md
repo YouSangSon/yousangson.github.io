@@ -1,3 +1,11 @@
+---
+title: Kotlin + Spring Boot로 웹 크롤러 만들기
+description: Jsoup을 활용한 웹 크롤링 API 구현 및 코루틴/가상 스레드 비동기 처리 비교
+categories: [spring boot, kotlin]
+tags: [spring boot, kotlin, web crawling, jsoup, coroutine]
+date: 2024-03-06
+---
+
 Kotlin과 Spring Boot를 사용하여 API 요청을 받고, 웹 사이트를 크롤링하여 데이터를 가져오는 애플리케이션을 만드는 방법을 단계별로 설명해 드리겠습니다.
 
 1. 프로젝트 설정

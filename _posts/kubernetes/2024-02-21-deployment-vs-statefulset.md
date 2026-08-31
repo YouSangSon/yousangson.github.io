@@ -1,3 +1,11 @@
+---
+title: Kubernetes Deployment vs StatefulSet 차이점
+description: Deployment와 StatefulSet의 주요 차이점과 사용 사례 비교
+categories: [kubernetes]
+tags: [kubernetes, deployment, statefulset, k8s]
+date: 2024-02-21
+---
+
 Deployment와 StatefulSet은 Kubernetes에서 사용되는 중요한 워크로드 리소스입니다. 두 리소스의 주요 차이점은 다음과 같습니다:
 
 1. 상태 관리
