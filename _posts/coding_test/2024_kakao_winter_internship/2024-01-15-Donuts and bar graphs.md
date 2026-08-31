@@ -10,17 +10,17 @@ sitemap:
 ## 출처 [프로그래머스](https://school.programmers.co.kr/learn/courses/30/lessons/258711)
 
 ### 문제 설명
-도넛 모양 그래프, 막대 모양 그래프, 8자 모양 그래프들이 있습니다. 
+도넛 모양 그래프, 막대 모양 그래프, 8자 모양 그래프들이 있습니다.
 
 이 그래프들은 1개 이상의 정점과, 정점들을 연결하는 단방향 간선으로 이루어져 있습니다.
 
-크기가 n인 도넛 모양 그래프는 n개의 정점과 n개의 간선이 있습니다. 
+크기가 n인 도넛 모양 그래프는 n개의 정점과 n개의 간선이 있습니다.
 
 도넛 모양 그래프의 아무 한 정점에서 출발해 이용한 적 없는 간선을 계속 따라가면 나머지 n-1개의 정점들을 한 번씩 방문한 뒤 원래 출발했던 정점으로 돌아오게 됩니다. 도넛 모양 그래프의 형태는 다음과 같습니다.
 
 ![image](/assets/images/2024_kakao_winter_internship/Donuts_and_bar_graphs/image.png)
 
-크기가 n인 막대 모양 그래프는 n개의 정점과 n-1개의 간선이 있습니다. 
+크기가 n인 막대 모양 그래프는 n개의 정점과 n-1개의 간선이 있습니다.
 
 막대 모양 그래프는 임의의 한 정점에서 출발해 간선을 계속 따라가면 나머지 n-1개의 정점을 한 번씩 방문하게 되는 정점이 단 하나 존재합니다. 막대 모양 그래프의 형태는 다음과 같습니다.
 
@@ -255,15 +255,15 @@ class Solution {
     fun solution(edges: Array<IntArray>): IntArray {
         val inDegree = mutableMapOf<Int, Int>()
         val outDegree = mutableMapOf<Int, Int>()
-    
+
         for (edge in edges) {
             outDegree[edge[0]] = outDegree.getOrDefault(edge[0], 0) + 1
             inDegree[edge[1]] = inDegree.getOrDefault(edge[1], 0) + 1
         }
-    
+
         val generatedVertex = outDegree.entries.find { (k, v) -> k !in inDegree && v >= 2 }?.key ?: -1
         val totalGraphs = outDegree[generatedVertex] ?: 0
-    
+
         var barGraphs = 0
         var figureEightGraphs = 0
         inDegree.forEach { (k, v) ->
@@ -274,9 +274,9 @@ class Solution {
                 }
             }
         }
-    
+
         val donutGraphs = totalGraphs - barGraphs - figureEightGraphs
-    
+
         return intArrayOf(generatedVertex, donutGraphs, barGraphs, figureEightGraphs)
     }
 }
