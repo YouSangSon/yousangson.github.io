@@ -1,0 +1,29 @@
+---
+import { themeConfig } from '@/config'
+import { ui } from '@/i18n/ui'
+import { getPageInfo } from '@/utils/page'
+
+const { currentLang, getLocalizedPath, isHome } = getPageInfo(Astro.url.pathname)
+const { title, subtitle, i18nTitle } = themeConfig.site
+
+const currentUI = ui[currentLang as keyof typeof ui] ?? {}
+const headerTitle = i18nTitle ? currentUI.title : title
+const headerSubtitle = i18nTitle ? currentUI.subtitle : subtitle
+
+const TitleTag = isHome ? 'h1' : 'div'
+---
+
+<header class="site-header">
+  <p class="site-eyebrow">Engineering notes</p>
+  <TitleTag class="site-title">
+    <a
+      id="site-title-link"
+      href={getLocalizedPath('/')}
+      transition:name={`site-title-${currentLang}`}
+      data-disable-theme-toggle-transition
+    >
+      {headerTitle}
+    </a>
+  </TitleTag>
+  {headerSubtitle && <p class="site-subtitle">{headerSubtitle}</p>}
+</header>

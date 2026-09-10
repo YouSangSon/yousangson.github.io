@@ -1,0 +1,33 @@
+---
+import PostList from '@/components/PostList.astro'
+import { allLocales } from '@/config'
+import { getLangFromLocale, getLangRouteParam } from '@/i18n/lang'
+import { getLocalizedPath } from '@/i18n/path'
+import Layout from '@/layouts/Layout.astro'
+import { getPosts } from '@/utils/content'
+
+export async function getStaticPaths() {
+  return allLocales.map(lang => ({
+    params: { lang: getLangRouteParam(lang) },
+  }))
+}
+
+const currentLang = getLangFromLocale(Astro.currentLocale)
+const posts = (await getPosts(currentLang)).slice(0, 10)
+---
+
+<Layout>
+  <section class="home-section" aria-labelledby="latest-posts-heading">
+    <div class="home-section-heading">
+      <div>
+        <p class="section-eyebrow">Latest notes</p>
+        <h2 id="latest-posts-heading">최근 글</h2>
+      </div>
+      <p>백엔드 개발과 시스템 설계에서 배운 것을 정리합니다.</p>
+    </div>
+    <PostList posts={posts} lang={currentLang} headingLevel="h3" />
+    <a class="archive-link" href={getLocalizedPath('/archives/', currentLang)}>
+      모든 글 보기
+    </a>
+  </section>
+</Layout>

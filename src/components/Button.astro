@@ -1,0 +1,112 @@
+---
+import type { Language } from '@/i18n/config'
+import LanguageSwitcherIcon from '@/assets/icons/language-switcher.svg'
+import ThemeToggleIcon from '@/assets/icons/theme-toggle.svg'
+import { moreLocales, themeConfig } from '@/config'
+import { getNextGlobalLangPath, getNextSupportedLangPath } from '@/i18n/path'
+
+interface Props {
+  supportedLangs: Language[]
+}
+
+const {
+  light: { background: lightMode },
+  dark: { background: darkMode },
+} = themeConfig.color
+
+const { supportedLangs } = Astro.props
+const currentPath = Astro.url.pathname
+
+// Check if there are other languages to switch
+const showLanguageSwitcher = moreLocales.length > 0
+// Choose a language switch list according to supported languages
+const nextUrl = supportedLangs.length > 0
+  ? getNextSupportedLangPath(currentPath, supportedLangs) // Use supported languages when available
+  : getNextGlobalLangPath(currentPath) // Fallback to all languages when no supported languages data
+---
+
+<div
+  class="site-actions"
+>
+  <!-- Language Switcher -->
+  {showLanguageSwitcher && (
+    <a
+      id="language-switcher"
+      href={nextUrl}
+      class="site-icon-button"
+      aria-label="언어 전환"
+    >
+      <LanguageSwitcherIcon
+        aria-hidden="true"
+        fill="currentColor"
+      />
+    </a>
+  )}
+
+  <!-- Theme Toggle -->
+  <button
+    id="theme-toggle-button"
+    type="button"
+    class="site-icon-button"
+    data-light-mode={lightMode}
+    data-dark-mode={darkMode}
+    aria-label="밝은 테마와 어두운 테마 전환"
+    aria-pressed={themeConfig.color.mode === 'dark'}
+  >
+    <ThemeToggleIcon
+      aria-hidden="true"
+      fill="currentColor"
+    />
+  </button>
+</div>
+
+<!-- Theme Toggle Script >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> -->
+<script>
+// Apply theme changes
+function applyTheme(isDark: boolean) {
+  document.documentElement.classList.toggle('dark', isDark)
+
+  // Update meta theme-color tag
+  const metaThemeColor = document.head.querySelector('meta[name="theme-color"]')
+  const themeButton = document.getElementById('theme-toggle-button')
+  const lightMode = themeButton?.dataset.lightMode
+  const darkMode = themeButton?.dataset.darkMode
+
+  if (metaThemeColor && lightMode && darkMode) {
+    metaThemeColor.setAttribute('content', isDark ? darkMode : lightMode)
+  }
+
+  themeButton?.setAttribute('aria-pressed', String(isDark))
+
+  localStorage.setItem('theme', isDark ? 'dark' : 'light')
+  document.dispatchEvent(new Event('theme-changed'))
+}
+
+// Toggle theme mode
+function toggleTheme() {
+  const isDark = !document.documentElement.classList.contains('dark')
+  applyTheme(isDark)
+}
+
+// Handle theme toggle click events
+function handleThemeToggle(e: MouseEvent) {
+  if (!(e.target instanceof Element)) {
+    return
+  }
+
+  if (!e.target.closest('#theme-toggle-button')) {
+    return
+  }
+
+  toggleTheme()
+}
+
+// Listen to system theme changes in real time
+function handleSystemChange(event: MediaQueryListEvent) {
+  const isDark = event.matches
+  applyTheme(isDark)
+}
+
+document.addEventListener('click', handleThemeToggle)
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', handleSystemChange)
+</script>

@@ -1,0 +1,51 @@
+---
+import { ui } from '@/i18n/ui'
+import { getPageInfo } from '@/utils/page'
+
+const { currentLang, isHome, isPost, isTag, isAbout, getLocalizedPath } = getPageInfo(Astro.url.pathname)
+const currentUI = ui[currentLang as keyof typeof ui] ?? {}
+
+const isPostActive = isHome || isPost
+const isTagActive = isTag
+const isAboutActive = isAbout
+const isSearchActive = /\/search\/?$/.test(Astro.url.pathname)
+
+const navItems = [
+  {
+    href: '/',
+    label: currentLang === 'ko' ? '글목록' : currentUI.posts,
+    active: isPostActive,
+  },
+  {
+    href: '/tags/',
+    label: currentLang === 'ko' ? '주제' : currentUI.tags,
+    active: isTagActive,
+  },
+  {
+    href: '/search/',
+    label: currentLang === 'ko' ? '검색' : 'Search',
+    active: isSearchActive,
+  },
+  {
+    href: '/about/',
+    label: currentUI.about,
+    active: isAboutActive,
+  },
+]
+---
+
+<nav aria-label={currentLang === 'ko' ? '주요 메뉴' : 'Primary navigation'} class="site-navigation">
+  <ul class="site-navigation-list">
+    {navItems.map(item => (
+      <li>
+        <a
+          href={getLocalizedPath(item.href)}
+          class:list={['site-navigation-link', item.active && 'is-active']}
+          aria-current={item.active ? 'page' : undefined}
+        >
+          {item.label}
+        </a>
+      </li>
+    ))}
+  </ul>
+</nav>

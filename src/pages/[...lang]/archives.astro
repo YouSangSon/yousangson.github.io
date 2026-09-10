@@ -1,0 +1,25 @@
+---
+import PostList from '@/components/PostList.astro'
+import { allLocales } from '@/config'
+import { getLangFromLocale, getLangRouteParam } from '@/i18n/lang'
+import Layout from '@/layouts/Layout.astro'
+import { getPostsByYear } from '@/utils/content'
+
+export function getStaticPaths() {
+  return allLocales.map(lang => ({ params: { lang: getLangRouteParam(lang) } }))
+}
+
+const currentLang = getLangFromLocale(Astro.currentLocale)
+const postsByYear = await getPostsByYear(currentLang)
+---
+
+<Layout postTitle="전체 글" postDescription="발행일 순서로 정리한 모든 개발 기록">
+  <div class="uno-decorative-line" />
+  <h1 class="mb-8 text-7 c-primary font-bold">전체 글</h1>
+  {Array.from(postsByYear.entries(), ([year, posts]) => (
+    <section class="mb-10" aria-labelledby={`year-${year}`}>
+      <h2 id={`year-${year}`} class="mb-4 text-6 c-primary font-semibold">{year}</h2>
+      <PostList {posts} lang={currentLang} />
+    </section>
+  ))}
+</Layout>

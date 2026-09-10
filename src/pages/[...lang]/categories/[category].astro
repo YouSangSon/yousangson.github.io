@@ -1,0 +1,35 @@
+---
+import CategoryList from '@/components/CategoryList.astro'
+import PostList from '@/components/PostList.astro'
+import { allLocales } from '@/config'
+import { getLangFromLocale, getLangRouteParam } from '@/i18n/lang'
+import Layout from '@/layouts/Layout.astro'
+import { getAllCategories, getCategorySupportedLangs, getPostsByCategory } from '@/utils/content'
+import { slugifyTaxonomy } from '@/utils/taxonomy'
+
+export async function getStaticPaths() {
+  const paths = await Promise.all(allLocales.map(async (lang) => {
+    const categories = await getAllCategories(lang)
+    return categories.map(category => ({
+      params: { lang: getLangRouteParam(lang), category: slugifyTaxonomy(category) },
+      props: { category },
+    }))
+  }))
+  return paths.flat()
+}
+
+interface Props { category: string }
+
+const { category } = Astro.props
+const currentLang = getLangFromLocale(Astro.currentLocale)
+const posts = await getPostsByCategory(category, currentLang)
+const categories = await getAllCategories(currentLang)
+const supportedLangs = await getCategorySupportedLangs(category)
+---
+
+<Layout postTitle={category} postDescription={`${category} 카테고리 글`} {supportedLangs}>
+  <div class="uno-decorative-line" />
+  <h1 class="mb-6 text-7 c-primary font-bold">{category}</h1>
+  <CategoryList {categories} currentCategory={category} lang={currentLang} />
+  <PostList {posts} lang={currentLang} />
+</Layout>

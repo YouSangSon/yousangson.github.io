@@ -1,0 +1,72 @@
+<script>
+const timeoutMap = new WeakMap<Element, number>()
+let statusTimeoutId: number | undefined
+
+function announceCopyStatus(message: string) {
+  const status = document.getElementById('copy-status')
+  if (!status) {
+    return
+  }
+
+  if (statusTimeoutId) {
+    window.clearTimeout(statusTimeoutId)
+  }
+
+  status.textContent = ''
+  window.requestAnimationFrame(() => {
+    status.textContent = message
+    statusTimeoutId = window.setTimeout(() => {
+      status.textContent = ''
+      statusTimeoutId = undefined
+    }, 4000)
+  })
+}
+
+async function handleCodeCopyClick(e: MouseEvent) {
+  if (!(e.target instanceof Element)) {
+    return
+  }
+
+  const button = e.target.closest('.code-copy-button')
+  if (!button) {
+    return
+  }
+
+  const text = button.parentElement?.querySelector('pre > code')?.textContent
+  if (!text) {
+    return
+  }
+
+  // Copy text to clipboard
+  try {
+    await navigator.clipboard.writeText(text)
+  }
+  catch (error) {
+    console.error('[CodeCopyButton] Failed to copy:', error)
+    announceCopyStatus('복사하지 못했습니다. 코드를 직접 선택해 주세요.')
+    return
+  }
+
+  // Add copied state
+  button.classList.add('copied')
+  button.setAttribute('aria-label', '복사 완료')
+  announceCopyStatus('코드를 복사했습니다.')
+
+  // Clear existing timeout to prevent state flickering
+  const existingTimeout = timeoutMap.get(button)
+  if (existingTimeout) {
+    clearTimeout(existingTimeout)
+  }
+
+  // Reset state after 1.5s
+  const timeoutId = window.setTimeout(() => {
+    button.classList.remove('copied')
+    button.setAttribute('aria-label', '코드 복사')
+    timeoutMap.delete(button)
+  }, 1500)
+
+  timeoutMap.set(button, timeoutId)
+}
+
+document.addEventListener('click', handleCodeCopyClick)
+</script>

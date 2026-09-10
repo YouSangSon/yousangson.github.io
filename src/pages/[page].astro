@@ -1,0 +1,41 @@
+---
+import type { Post } from '@/types'
+import PostList from '@/components/PostList.astro'
+import { defaultLocale } from '@/config'
+import Layout from '@/layouts/Layout.astro'
+import { getRegularPosts } from '@/utils/content'
+
+export async function getStaticPaths() {
+  const pageSize = 10
+  const posts = await getRegularPosts(defaultLocale)
+  const pageCount = Math.ceil(posts.length / pageSize)
+
+  return Array.from({ length: Math.max(0, pageCount - 1) }, (_, index) => {
+    const pageNumber = index + 2
+    const start = (pageNumber - 1) * pageSize
+    return {
+      params: { page: `page${pageNumber}` },
+      props: { pageNumber, pageCount, posts: posts.slice(start, start + pageSize) },
+    }
+  })
+}
+
+interface Props {
+  pageNumber: number
+  pageCount: number
+  posts: Post[]
+}
+
+const { pageNumber, pageCount, posts } = Astro.props
+const previousPath = pageNumber === 2 ? '/' : `/page${pageNumber - 1}/`
+const nextPath = pageNumber === pageCount ? undefined : `/page${pageNumber + 1}/`
+---
+
+<Layout postTitle={`글 목록 ${pageNumber}`} postDescription={`개발 기록 ${pageNumber}페이지`}>
+  <div class="uno-decorative-line" />
+  <PostList {posts} lang={defaultLocale} />
+  <nav class="mt-10 flex justify-between" aria-label="글 목록 페이지">
+    <a class="font-semibold underline" href={previousPath}>이전</a>
+    {nextPath && <a class="font-semibold underline" href={nextPath}>다음</a>}
+  </nav>
+</Layout>

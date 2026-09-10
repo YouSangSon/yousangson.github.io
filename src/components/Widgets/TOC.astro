@@ -1,0 +1,58 @@
+---
+import type { MarkdownHeading } from 'astro'
+import TocIcon from '@/assets/icons/toc-icon.svg'
+import { ui } from '@/i18n/ui'
+import { getPageInfo } from '@/utils/page'
+
+interface Props {
+  headings: MarkdownHeading[]
+}
+
+const { currentLang } = getPageInfo(Astro.url.pathname)
+const currentUI = ui[currentLang as keyof typeof ui] ?? {}
+
+const { headings = [] } = Astro.props
+const filteredHeadings = headings.filter(heading => heading.depth >= 2 && heading.depth <= 4)
+---
+
+{filteredHeadings.length > 0 && (
+  // TOC Container
+  <details
+    id="toc-container"
+    class="mb-6 uno-round-border bg-secondary/5"
+  >
+    <summary class="min-h-12 flex cursor-pointer items-center px-4">
+      <span id="toc-mobile-text">{currentUI.toc}</span>
+      <TocIcon aria-hidden="true" class="ml-auto aspect-square w-5" fill="currentColor" />
+    </summary>
+
+    <nav
+      id="toc-accordion-content"
+      aria-label={currentLang === 'ko' ? '목차' : 'Table of contents'}
+    >
+        {/* TOC List */}
+        <ul id="toc-links-list">
+          {filteredHeadings.map(heading => (
+            <li
+              class:list={{
+                'ml-0': heading.depth === 2,
+                'ml-4': heading.depth === 3,
+                'ml-8': heading.depth === 4,
+              }}
+            >
+              <a
+                href={`#${heading.slug}`}
+                class:list={[
+                  { 'no-heti toc-links-h2': heading.depth === 2 },
+                  { 'no-heti toc-links-h3': heading.depth === 3 },
+                  { 'no-heti toc-links-h4': heading.depth === 4 },
+                ]}
+              >
+                {heading.text}
+              </a>
+            </li>
+          ))}
+        </ul>
+    </nav>
+  </details>
+)}

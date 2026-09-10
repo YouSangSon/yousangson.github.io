@@ -1,0 +1,68 @@
+---
+import type { Language } from '@/i18n/config'
+import type { Post } from '@/types'
+import PinIcon from '@/assets/icons/pin-icon.svg'
+import PostDate from '@/components/PostDate.astro'
+import { getPostPath } from '@/i18n/path'
+import { getPostDescription } from '@/utils/description'
+import { isHomePage } from '@/utils/page'
+
+export interface Props {
+  posts: Post[]
+  lang: Language
+  pinned?: boolean
+  headingLevel?: 'h2' | 'h3'
+}
+
+const { posts, lang, pinned = false, headingLevel: Heading = 'h2' } = Astro.props
+const isHome = isHomePage(Astro.url.pathname)
+---
+
+<ul class="post-list">
+  {posts.map((post) => {
+    const slug = post.data.abbrlink || post.id
+
+    return (
+      <li class="post-list-item">
+        <article>
+          {/* post title */}
+          <Heading class="post-list-title">
+            <a
+              class="post-list-link"
+              href={getPostPath(slug, lang)}
+              transition:name={`post-${slug}${lang ? `-${lang}` : ''}`}
+              data-disable-theme-toggle-transition
+            >
+              {post.data.title}
+            </a>
+            {/* pinned icon */}
+            {pinned && (
+              <PinIcon
+                aria-hidden="true"
+                class="ml-0.25em inline-block aspect-square w-0.98em translate-y--0.1em lg:(w-1.05em translate-y--0.15em)"
+                fill="currentColor"
+              />
+            )}
+          </Heading>
+
+          <div
+            class="post-list-meta"
+            transition:name={`time-${slug}${lang ? `-${lang}` : ''}`}
+            data-disable-theme-toggle-transition
+          >
+            <PostDate
+              date={post.data.published}
+              minutes={post.remarkPluginFrontmatter.minutes}
+            />
+          </div>
+
+          {isHome && (
+            <div class="post-list-description">
+              <p>{getPostDescription(post, 'list')}</p>
+            </div>
+          )}
+        </article>
+      </li>
+    )
+  })}
+</ul>

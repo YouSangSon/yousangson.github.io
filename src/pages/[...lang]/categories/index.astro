@@ -1,0 +1,20 @@
+---
+import CategoryList from '@/components/CategoryList.astro'
+import { allLocales } from '@/config'
+import { getLangFromLocale, getLangRouteParam } from '@/i18n/lang'
+import Layout from '@/layouts/Layout.astro'
+import { getAllCategories } from '@/utils/content'
+
+export function getStaticPaths() {
+  return allLocales.map(lang => ({ params: { lang: getLangRouteParam(lang) } }))
+}
+
+const currentLang = getLangFromLocale(Astro.currentLocale)
+const categories = await getAllCategories(currentLang)
+---
+
+<Layout postTitle="카테고리" postDescription="주제별 개발 기록">
+  <div class="uno-decorative-line" />
+  <h1 class="mb-6 text-7 c-primary font-bold">카테고리</h1>
+  <CategoryList {categories} lang={currentLang} />
+</Layout>

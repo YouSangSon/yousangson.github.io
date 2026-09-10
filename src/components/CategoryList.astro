@@ -1,0 +1,29 @@
+---
+import type { Language } from '@/i18n/config'
+import { getCategoryPath } from '@/i18n/path'
+
+interface Props {
+  categories: string[]
+  currentCategory?: string
+  lang: Language
+}
+
+const { categories, currentCategory = '', lang } = Astro.props
+---
+
+<div class="no-heti mb-10.5 flex flex-wrap gap-x-3 gap-y-3.2">
+  {categories.map(category => (
+    <a
+      href={getCategoryPath(category, lang)}
+      class:list={[
+        'relative inline-block border border-secondary/25 rounded-full px-3.2 py-0.7 ring-secondary/80',
+        'transition-[colors,box-shadow] ease-out hover:(border-secondary/80 c-primary font-medium ring-0.2)',
+        currentCategory === category
+          ? 'border-secondary/80 c-primary font-medium ring-0.2'
+          : 'ring-0',
+      ]}
+    >
+      {category}
+    </a>
+  ))}
+</div>

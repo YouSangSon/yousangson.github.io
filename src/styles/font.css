@@ -1,0 +1,25 @@
+/* System fonts keep Korean text fast, familiar, and free of external font requests. */
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Segoe UI", sans-serif;
+  --font-display: Georgia, "Times New Roman", "Apple SD Gothic Neo", "Noto Sans KR", serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+html,
+body,
+.font-navbar,
+.heti {
+  font-family: var(--font-sans);
+}
+
+.font-title,
+.font-time {
+  font-family: var(--font-display);
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-mono);
+}
