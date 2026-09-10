@@ -71,11 +71,11 @@ function formatDate(date: Date, format: DateFormat) {
     datetime={updatedDate.toISOString().split('T')[0]}
     class={timeSpacingClass}
   >
-  {language === 'ko' ? '수정' : 'updated'} {formatDate(updatedDate, format)}
+  {language.startsWith('ko') ? '수정' : 'updated'} {formatDate(updatedDate, format)}
   </time>
 )}
 
 <!-- reading time -->
 <span class={timeSpacingClass}>
-  {language === 'ko' ? `읽는 데 ${Math.max(1, Math.ceil(minutes))}분` : `${Math.max(1, Math.ceil(minutes))} min`}
+  {language.startsWith('ko') ? `읽는 데 ${Math.max(1, Math.ceil(minutes))}분` : `${Math.max(1, Math.ceil(minutes))} min`}
 </span>

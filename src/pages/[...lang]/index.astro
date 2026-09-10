@@ -1,10 +1,12 @@
 ---
+import PostDate from '@/components/PostDate.astro'
 import PostList from '@/components/PostList.astro'
 import { allLocales } from '@/config'
 import { getLangFromLocale, getLangRouteParam } from '@/i18n/lang'
-import { getLocalizedPath } from '@/i18n/path'
+import { getLocalizedPath, getPostPath } from '@/i18n/path'
 import Layout from '@/layouts/Layout.astro'
 import { getPosts } from '@/utils/content'
+import { getPostDescription } from '@/utils/description'
 
 export async function getStaticPaths() {
   return allLocales.map(lang => ({
@@ -14,18 +16,52 @@ export async function getStaticPaths() {
 
 const currentLang = getLangFromLocale(Astro.currentLocale)
 const posts = (await getPosts(currentLang)).slice(0, 10)
+const [featured, companion] = posts
 ---
 
 <Layout>
+  {featured && (
+    <section class="featured-note" aria-labelledby="featured-heading">
+      <div class="featured-copy">
+        <p class="section-eyebrow">새로 쓴 글 <span aria-hidden="true">↗</span></p>
+        <h2 id="featured-heading"><a href={getPostPath(featured.data.abbrlink || featured.id, currentLang)}>{featured.data.title}</a></h2>
+        <p class="featured-description">{getPostDescription(featured, 'list')}</p>
+        <div class="post-list-meta"><PostDate date={featured.data.published} minutes={featured.remarkPluginFrontmatter.minutes} /></div>
+        <a class="featured-read" href={getPostPath(featured.data.abbrlink || featured.id, currentLang)}>글 읽기 <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="editorial-art" aria-hidden="true">
+        <svg viewBox="0 0 480 440" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs><pattern id="editorial-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" stroke="currentColor" stroke-opacity=".12" /></pattern></defs>
+          <path fill="url(#editorial-grid)" d="M0 0h480v440H0z" />
+          <circle cx="335" cy="135" r="89" fill="var(--art-sun)" />
+          <path d="M60 352V200a132 132 0 0 1 264 0v152" stroke="currentColor" stroke-width="1.5" />
+          <path d="M87 352V200a105 105 0 0 1 210 0v152" stroke="currentColor" stroke-opacity=".35" />
+          <path d="m165 145 193 42-39 180-193-42z" fill="var(--art-sage)" stroke="currentColor" stroke-width="1.5" />
+          <path d="M139 170h196v190H139z" fill="var(--art-paper)" stroke="currentColor" stroke-width="1.5" />
+          <path d="M167 207h47m-47 18h138m-138 13h99m-99 84h138" stroke="currentColor" stroke-opacity=".6" stroke-width="2" />
+          <circle cx="190" cy="280" r="13" stroke="currentColor" stroke-width="1.5" />
+          <path d="M203 280h40m0 0-7-7m7 7-7 7m15-21h38v28h-38z" stroke="currentColor" stroke-width="1.5" />
+          <circle cx="91" cy="354" r="29" fill="var(--art-rust)" />
+          <path d="M66 395h348M380 306v48m-24-24h48" stroke="currentColor" stroke-width="1.5" />
+        </svg>
+      </div>
+    </section>
+  )}
+  {companion && (
+    <aside class="companion-note">
+      <span class="section-eyebrow">함께 읽기</span>
+      <a href={getPostPath(companion.data.abbrlink || companion.id, currentLang)}>{companion.data.title}<span aria-hidden="true">↗</span></a>
+    </aside>
+  )}
   <section class="home-section" aria-labelledby="latest-posts-heading">
     <div class="home-section-heading">
       <div>
-        <p class="section-eyebrow">Latest notes</p>
-        <h2 id="latest-posts-heading">최근 글</h2>
+        <p class="section-eyebrow">The notebook</p>
+        <h2 id="latest-posts-heading">차곡차곡 쌓인 기록</h2>
       </div>
       <p>백엔드 개발과 시스템 설계에서 배운 것을 정리합니다.</p>
     </div>
-    <PostList posts={posts} lang={currentLang} headingLevel="h3" />
+    <PostList posts={posts.slice(2)} lang={currentLang} headingLevel="h3" />
     <a class="archive-link" href={getLocalizedPath('/archives/', currentLang)}>
       모든 글 보기
     </a>
