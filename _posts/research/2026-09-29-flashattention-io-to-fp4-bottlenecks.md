@@ -20,7 +20,7 @@ tags: [paper-review, attention, optimization]
 
 ## 첫 번째 비용: `N × N`을 계산하는 것과 저장하는 것은 다르다
 
-한 attention head에서 `N`은 토큰 수, `d`는 head 차원이다. 쿼리 `Q`, 키 `K`, 값 `V`는 각각 `N × d` 행렬이고, 보통 `S = QKᵀ/√d`, `P = softmax(S)`, `O = PV`로 출력을 구한다. Softmax는 `S`의 각 행에 적용된다. 평범하게 세 연산을 별도 커널로 실행하면 `S`와 `P`가 각각 `N × N` 크기로 HBM에 기록되고 다시 읽힌다.
+한 attention head에서 `N`은 토큰 수, `d`는 head 차원이다. 쿼리 `Q`, 키 `K`, 값 `V`는 각각 `N × d` 행렬이고, 보통 `S = QKᵀ/√d`, `P = softmax(S)`, `O = PV`로 출력을 구한다. Softmax는 `S`의 각 행에 적용된다. HBM(High Bandwidth Memory)은 GPU 칩 밖에 있는 대용량 메모리다. 용량이 큰 대신 칩 안의 작업 공간과 데이터를 주고받는 비용이 든다. 평범하게 세 연산을 별도 커널로 실행하면 `S`와 `P`가 각각 `N × N` 크기로 HBM에 기록되고 다시 읽힌다.
 
 예를 들어 한 head에서 `N=4096`이면 중간 행렬 한 장이 약 1,678만 원소다. 원소가 2바이트라고 가정할 때 행렬 한 장에만 32 MiB가 든다. MiB는 2²⁰바이트다. 이 크기는 설명을 위한 산술값이며 특정 GPU에서 측정한 메모리 사용량이 아니다. [FlashAttention v1, 4쪽 §2.2·Algorithm 0](https://arxiv.org/pdf/2205.14135v1#page=4)
 
