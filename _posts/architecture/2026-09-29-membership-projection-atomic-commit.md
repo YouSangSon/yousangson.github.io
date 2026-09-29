@@ -39,6 +39,13 @@ assert db.execute("SELECT * FROM source").fetchone() == (1, 1)
 assert db.execute("SELECT * FROM view_total").fetchone() == (1, 1)
 print("failed second write: source=1/view=1")
 
+```
+
+둘째 쓰기가 실패하자 원본도 `(1, 1)`로 돌아간다. 한 트랜잭션의 원자성이 막은 것은 부분 저장이다. 이제 조회용 합계를 나중에 갱신하는 경로로 바꿔 보자. 세 코드 블록은 위에서부터 같은 파일에 이어 붙여 실행한다.
+
+### 갱신 의도를 저장해도 실행 순서까지 정해지지는 않는다
+
+```python
 # 비동기 경로: 원본과 '합계를 2로 만들라'는 의도를 함께 커밋.
 with db:
     db.execute("UPDATE source SET quantity=2, revision=2")
@@ -53,6 +60,13 @@ db.commit()
 assert db.execute("SELECT * FROM view_total").fetchone() == (1, 1)
 print("unconditional late write: source=2/view=1")
 
+```
+
+원본과 outbox를 함께 저장했어도 소비자가 순서를 뒤집어 적용하면 합계는 다시 1이 된다. outbox는 할 일을 잃지 않게 하지만, 오래된 계산 결과를 자동으로 거절하지는 않는다.
+
+### 저장할 때 revision을 비교한다
+
+```python
 # 같은 초기 상태에서, 더 새로운 revision만 반영.
 def apply(revision, total):
     with db:

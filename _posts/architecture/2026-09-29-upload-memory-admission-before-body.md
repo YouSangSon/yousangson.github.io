@@ -47,12 +47,27 @@ part당 필요한 크기    = floor(5,497,558,138,880 / 10,000)
 func (p *probeReader) Read(b []byte) (int, error) {
     var m runtime.MemStats
     runtime.ReadMemStats(&m)
+    p.called = true
     // 이 시점에는 아직 입력을 한 바이트도 반환하지 않았다.
     fmt.Printf("Read buffer=%.0f MiB; allocated before Read=%.2f MiB\n",
         float64(len(b))/(1<<20), float64(m.TotalAlloc-p.before)/(1<<20))
     return 0, stop
 }
 ```
+
+이 reader를 SDK에 넘기는 호출은 다음과 같다. `configured`를 `0`과 `8 * 1024 * 1024`로 바꾸어 비교한다. 길이 인자 `-1`은 전체 크기를 모른다는 뜻이다.
+
+```go
+_, err := client.PutObject(
+    context.Background(), "demo-bucket", "demo", reader, -1,
+    minio.PutObjectOptions{PartSize: configured},
+)
+if !reader.called || !errors.Is(err, stop) {
+    panic("probe must stop at its first Read")
+}
+```
+
+여기서는 첫 읽기에서 의도적으로 실패시켜 할당 시점만 본다. 실제 업로드라면 `PutObject` 오류를 처리하고, 저장 성공을 확인한 뒤에만 완료로 기록해야 한다.
 
 Go 1.24.5, darwin/arm64에서 `PartSize=0`과 `PartSize=8 MiB`를 순서대로 실행한 결과다.
 

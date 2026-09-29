@@ -20,6 +20,23 @@ date: 2026-09-10
 
 이 숫자는 네트워크에서 받은 바이트 수가 아니라 **이 모델의 handler가 읽은 수**다. `Content-Length: 2`를 봤더라도 인증 전에 끝난 요청이 본문을 읽었다고 말할 수 없다. Go의 `http.Request.Body`는 읽을 수 있는 스트림이다. 관측 코드가 업무 코드보다 먼저 스트림을 소비하면 실패 응답의 시점과 handler가 보는 입력까지 바뀔 수 있다. [Go `http.Request` 문서](https://pkg.go.dev/net/http#Request)
 
+읽은 바이트 수를 세는 부분은 다음과 같다. `Read`를 미리 호출하지 않고, handler가 요청할 때 원래 reader로 전달한다. 반환된 `n`만 더하므로 일부 바이트와 오류가 함께 돌아와도 읽은 양을 잃지 않는다.
+
+```go
+type countedBody struct {
+    io.ReadCloser
+    read int
+}
+
+func (b *countedBody) Read(p []byte) (int, error) {
+    n, err := b.ReadCloser.Read(p)
+    b.read += n
+    return n, err
+}
+```
+
+이 reader는 요청마다 따로 만들며, 예제에서는 handler 하나가 순차적으로 읽는다. 원문을 복사해 보관하는 버퍼는 없다.
+
 ## 본문은 어느 단계까지 갔는가
 
 위 표의 첫 세 행은 서로 다른 사건이다. 인증 전 거절에서는 본문이 **미관측**이다. `{}`를 파싱한 요청에서는 서버가 실제 빈 객체를 확인했다. 잘못된 `{`에서는 1바이트를 읽었지만 완성된 JSON 값은 없다. 오류가 난 decoder의 부분 상태를 정상 입력처럼 기록하면 안 된다. Go의 `json.Decoder.Decode`가 반환한 오류를 값의 성공적인 해석과 구분해야 한다. [Go `encoding/json` 문서](https://pkg.go.dev/encoding/json#Decoder)
@@ -31,6 +48,25 @@ date: 2026-09-10
 ## 경로의 `n43`은 왜 확인된 대상이 아닌가
 
 `/notes/n43`에서 얻은 값은 클라이언트가 지정한 **후보 ID**다. 모델은 메모를 조회한 뒤 소유자를 비교한다. 다른 사람의 항목이면 403을 반환하고 `resolved`를 비워 둔다. 같은 ID가 URL에 적혀 있었다는 사실만으로 그 항목을 처리했다고 기록하지 않는다.
+
+인증과 JSON 파싱을 통과한 뒤의 핵심 분기는 아래와 같다. `out.supplied`에는 URL에서 얻은 후보가 있지만, `out.resolved`의 초기값은 빈 문자열이다.
+
+```go
+owner, exists := map[string]string{
+    "n42": "reader", "n43": "other",
+}[out.supplied]
+if !exists {
+    out.status = 404
+    return
+}
+if owner != verifiedPrincipal {
+    out.status = 403
+    return
+}
+out.resolved, out.status = out.supplied, 200
+```
+
+따라서 다른 사람의 메모를 요청한 경우에는 다음 기록이 남는다.
 
 ```text
 요청 파싱: supplied=n43
@@ -46,4 +82,4 @@ date: 2026-09-10
 
 OWASP는 접근 토큰·비밀번호·민감한 개인정보를 로그에 직접 남기지 말라고 안내한다. 로그 입력의 줄바꿈 등도 정제 대상이다. [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html#data-to-exclude)
 
-로컬 모델의 다섯 테스트는 통과했지만, 실제 인증·서비스 간 추적 전파·로그 저장까지 확인한 결과는 아니다. 자신의 서버에서도 동일한 `{}`를 인증 전후에 보내 보자. 진단 화면이 둘을 같은 빈 값으로 표시한다면, 값보다 **어느 단계에서 관측했는지**가 빠져 있다.
+이 모델을 실제 서버에 적용할 때는 인증·서비스 간 추적 전파·로그 저장 경로에서도 같은 구분이 유지되는지 확인해야 한다. 동일한 `{}`를 인증 전후에 보내 보자. 진단 화면이 둘을 같은 빈 값으로 표시한다면, 값보다 **어느 단계에서 관측했는지**가 빠져 있다.

@@ -59,6 +59,15 @@ assert reserve("A", 4)
 assert not reserve("B", 4)
 assert db.execute("SELECT used, held FROM quota").fetchone() == (4, 4)
 
+```
+
+A의 예약이 먼저 확정되면 `held`는 4가 된다. 같은 조건으로 들어온 B는 `used + held + size <= capacity`를 만족하지 못해 거절된다. 여기까지는 저장할 자리를 확보했을 뿐 실제 저장을 완료한 상태는 아니다.
+
+### 예약을 확정 사용량으로 옮긴다
+
+객체 저장 성공을 확인한 뒤에는 같은 요청 ID를 기준으로 예약 상태를 완료 상태로 바꾼다. 위 코드와 아래 코드를 순서대로 한 파일에 두고 실행한다.
+
+```python
 def finish(request_id):  # 객체 저장 성공을 확인한 뒤에만 호출
     with db:
         row = db.execute(

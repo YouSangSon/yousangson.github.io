@@ -28,12 +28,31 @@ Kafka의 파티션은 메시지가 순서대로 쌓이는 로그다. 각 메시�
 
 [실행 파일](/assets/examples/2026-09-29/messaging-depth/partition_frontier.py)을 `python3 partition_frontier.py`로 실행하면 슬롯 배정, 안전한 커밋 위치, 옛 할당 결과의 무시를 순서대로 확인한다. 슬롯 배정의 입력에서 각 쌍은 `(파티션 번호, 오프셋)`이다. 예를 들어 `(0, 10)`은 파티션 0의 오프셋 10에 있는 메시지를 뜻한다.
 
+배정 함수의 전체 구현은 다음과 같다. 전역 실행 슬롯은 두 개이고, 파티션별 제한에 걸린 후보는 건너뛰어 다른 파티션의 후보를 확인한다.
+
 ```python
+from collections import Counter
+
+def admit(records, per_partition_limit=None):
+    running = []
+    counts = Counter()
+    for partition, offset in records:
+        if len(running) == 2:
+            break
+        if per_partition_limit is not None and counts[partition] >= per_partition_limit:
+            continue
+        running.append((partition, offset))
+        counts[partition] += 1
+    return running
+
+
 records = [(0, 10), (0, 11), (1, 20)]
 shared = admit(records)
 isolated = admit(records, per_partition_limit=1)
 assert shared == [(0, 10), (0, 11)]
 assert isolated == [(0, 10), (1, 20)]
+print("shared slots:", shared)
+print("per-partition admission:", isolated)
 ```
 
 ```text

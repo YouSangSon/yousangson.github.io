@@ -17,6 +17,26 @@ Go 1.24.5로 실행한 가상 메모리 저장소는 두 패키지로 나뉜다.
 
 `draft.Store.Remove`는 초안이 없거나 활성 상태면 `false`를 돌려준다. 그 외에는 map에서 해당 ID를 지운다. `oldapi.Remove`의 본문은 `return store.Remove(id)` 한 줄이다. `draft`가 `oldapi`를 다시 import하면 Go 패키지 순환 의존이 되어 컴파일되지 않는다. 이 예제에서 코드가 놓인 파일보다 중요한 것은 후보 판단과 변경을 `draft`가 함께 소유한다는 점이다.
 
+핵심 구현은 두 함수다. `drafts`는 존재하는 초안, `active`는 현재 사용 중인 초안을 나타내는 map이다.
+
+```go
+// draft/store.go
+func (s *Store) Remove(id string) bool {
+    if !s.drafts[id] || s.active[id] {
+        return false
+    }
+    delete(s.drafts, id)
+    return true
+}
+
+// oldapi/cleanup.go
+func Remove(store *draft.Store, id string) bool {
+    return store.Remove(id)
+}
+```
+
+직접 호출과 호환 호출이 같은 함수에 도착하므로, 보호 조건을 고칠 곳도 하나다. 다음에는 이 구조가 실제로 같은 초안을 보존하는지 확인한다.
+
 ## '한 건 삭제'만으로는 부족하다
 
 입력은 `old`, `live`, `keep` 세 ID다. `live`만 활성 상태로 표시하고 `old`를 삭제한 뒤 `live` 삭제를 시도한다.

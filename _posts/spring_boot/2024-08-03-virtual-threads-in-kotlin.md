@@ -1,6 +1,6 @@
 ---
 title: Spring Boot에서 가상 스레드와 코루틴 함께 사용하기
-description: Java 21 가상 스레드와 Kotlin 코루틴을 Spring Boot에서 통합하는 방법
+description: Java 21과 Spring Boot 3.2에서 요청 스레드와 코루틴 dispatcher가 별도로 선택되는 이유를 실행 위치와 자원 수명으로 살펴본다.
 categories: [spring boot, kotlin]
 tags: [spring boot, virtual thread, coroutine, kotlin, java21]
 date: 2024-08-03
@@ -35,7 +35,7 @@ Spring Boot 3.2 릴리스 노트는 이 속성을 켠 내장 Tomcat과 Jetty가 
 
 여기까지는 Spring이 관리하는 실행기 이야기다. Kotlin의 `suspend`는 함수가 중단과 재개를 지원한다는 뜻이지, 특정 스레드 종류를 선언하는 키워드가 아니다. 코루틴의 현재 context와 dispatcher가 재개 위치를 결정한다. `withContext(otherDispatcher)`는 지정한 dispatcher에서 블록을 실행하고 이후 원래 context로 돌아올 수 있다. 따라서 Boot 속성을 켰다는 이유만으로 직접 생성한 `CoroutineScope`나 `Dispatchers.Default`의 작업까지 가상 스레드로 바뀌는 것은 아니다. [Kotlin coroutine context와 dispatcher](https://kotlinlang.org/docs/coroutine-context-and-dispatchers.html)
 
-세 경계를 분리해서 보면 설정 결과를 읽기 쉽다.
+요청 처리, 코루틴 재개, blocking 구간, 취소를 나누어 보면 각 설정이 어디에 적용되는지 읽기 쉽다.
 
 | 경계 | 실행 위치를 정하는 것 | 확인할 질문 |
 | --- | --- | --- |

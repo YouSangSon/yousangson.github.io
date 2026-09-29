@@ -72,6 +72,46 @@ def alphabetized(index):
 
 첫 구현은 회전한 문장을 모두 문자열로 저장한다. 두 번째 구현은 원본 단어와 `(line_id, start)`만 저장하고 읽을 때 문자열을 만든다. 이 쌍에서 `line_id`는 원본 줄 번호, `start`는 회전을 시작할 단어 위치다. 예를 들어 `(0, 1)`은 첫 번째 줄의 두 번째 단어부터 읽는 회전이다. 호출자는 이 쌍을 직접 받지 않는다.
 
+문자열을 미리 만드는 구현은 생성할 때 회전 결과를 복사한다. 이후 `text()`는 저장된 값 하나를 반환한다.
+
+```python
+class MaterializedShifts:
+    def __init__(self, lines):
+        self._rows = []
+        for line in lines:
+            words = line.split()
+            for start in range(len(words)):
+                self._rows.append(" ".join(words[start:] + words[:start]))
+
+    def count(self):
+        return len(self._rows)
+
+    def text(self, shift_id):
+        return self._rows[shift_id]
+```
+
+위치만 저장하는 구현은 `text()`를 호출할 때 원본 단어를 조합한다. 두 구현 모두 `count()`와 `text()`의 결과 의미를 지키므로 앞의 정렬 함수는 그대로 쓸 수 있다.
+
+```python
+class IndexedShifts:
+    def __init__(self, lines):
+        self._lines = [line.split() for line in lines]
+        # Deliberately reverse enumeration: the public contract promises no order.
+        self._locations = [
+            (line_id, start)
+            for line_id, words in enumerate(self._lines)
+            for start in range(len(words))
+        ][::-1]
+
+    def count(self):
+        return len(self._locations)
+
+    def text(self, shift_id):
+        line_id, start = self._locations[shift_id]
+        words = self._lines[line_id]
+        return " ".join(words[start:] + words[:start])
+```
+
 여기에 차이를 하나 더 넣었다. 두 번째 구현은 내부 항목 순서를 거꾸로 열거한다. 첫 항목부터 같은지 비교하면 실패하지만, 계약에 맞게 모든 항목을 정렬하면 같은 결과가 나온다. 표현만 바꾸고 우연히 같은 내부 순서를 유지하면 호출자의 불필요한 의존을 놓칠 수 있기 때문이다.
 
 [전체 예제 내려받기](/assets/examples/2026-09-29/paper-reviews/kwic_demo.py). Python 3 표준 라이브러리만 사용하며 외부 통신이나 파일 변경은 없다.

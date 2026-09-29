@@ -56,6 +56,13 @@ vectors.add((version, "B"))
 assert visible() == {"B"}
 print("delete before writer finishes:", sorted(visible()))
 
+```
+
+삭제 직후에도 옛 writer가 B를 추가하면 검색 결과가 되살아난다. 삭제 요청을 반복하는 것만으로는 다음 쓰기를 막을 수 없다.
+
+같은 파일에서 이어서 두 번째 순서를 실행한다. 검색에서 숨기는 tombstone과 재시작 후에도 찾아야 할 작업 기록을 먼저 만들고, writer가 끝날 때까지 물리 삭제를 미룬다.
+
+```python
 # 새 실행: 새 요청을 차단하는 tombstone과 복구할 작업 기록.
 vectors = {(version, "A")}
 tombstones.add(version)

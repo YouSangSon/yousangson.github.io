@@ -96,6 +96,15 @@ print("pinned read:", pinned_version, pinned_hits, "/", safe_citation)
 print("next read:", next_version, next_hits, "/", source[next_version])
 ```
 
+위 코드를 `versions_demo.py`에 저장하고 `python3 versions_demo.py`로 실행하면 다음 순서가 나온다.
+
+```text
+partial index -> published source: old manual
+unpinned citation: old A / new manual
+pinned read: 1 ('old A', 'old B') / old manual
+next read: 2 ('new A', 'new B') / new manual
+```
+
 첫 출력에서는 새 청크 하나가 보이지만 공개된 검색은 여전히 옛 원본을 사용한다. 두 번째 출력은 실제로 만들면 안 되는 `old A / new manual` 조합이다. 세대 1을 잡은 요청은 포인터가 바뀐 **뒤에** 저장한 세대로 원본을 조회해 `old manual`을 얻고, 다음 요청부터 세대 2를 읽는다. 이 예제의 `assert`는 부분 색인과 읽기 중 전환만 고정된 순서로 재현한다. 다중 작업자의 경쟁과 조건부 원자 갱신은 검증하지 않는다. 실제 서비스에서는 포인터 확인과 갱신을 조건부 원자 연산으로 구현하고, 검색자가 붙잡은 옛 세대를 요청이 끝나기 전에 지우지 않아야 한다.
 
 예를 들어 공개 포인터를 관계형 DB 행에 둔다면, 읽은 세대가 여전히 예상 값이고 새 세대가 준비됐다는 조건을 확인하며 갱신해야 한다. 늦게 끝난 옛 작업이 더 최신 세대를 다시 덮지 못하도록 목표 원본 버전도 그 조건에 포함한다. PostgreSQL 트랜잭션은 한 트랜잭션의 중간 쓰기를 다른 트랜잭션에 노출하지 않지만, 기본 Read Committed에서는 같은 트랜잭션 안의 연속된 두 SELECT도 서로 다른 커밋을 볼 수 있다. 그러므로 검색과 인용이 포인터를 두 번 조회하는 코드는 트랜잭션을 쓴다는 이유만으로 안전해지지 않는다. [PostgreSQL 트랜잭션](https://www.postgresql.org/docs/current/tutorial-transactions.html), [트랜잭션 격리](https://www.postgresql.org/docs/current/transaction-iso.html)

@@ -27,6 +27,38 @@ Go 1.24.5의 `Root`에는 `ReadFile` 메서드가 없다. 이 예제는 `root.Op
 
 테스트는 `a/payload`를 열어 둔 뒤, 다른 핸들로 같은 inode의 처음 8바이트를 `version1`에서 `version2`로 덮어썼다. 먼저 연 핸들에서 나중에 읽어도 `version2`가 나왔다. 이름을 바꿔 **다른 파일**로 교체한 경우와, 같은 파일의 **내용**을 바꾼 경우를 섞어 생각하면 이 차이를 놓친다.
 
+다음은 제자리 쓰기를 재현하는 테스트의 핵심이다. `root`는 앞에서 연 디렉터리 `a`를 가리키고, `a`는 테스트용 임시 경로다. 먼저 읽기 핸들을 열고, **같은 파일**에 쓰기를 완료한 다음, 처음 핸들에서 읽는다.
+
+```go
+held, err := root.Open("payload")
+if err != nil {
+    t.Fatal(err)
+}
+defer held.Close()
+
+writer, err := os.OpenFile(filepath.Join(a, "payload"), os.O_WRONLY, 0)
+if err != nil {
+    t.Fatal(err)
+}
+defer writer.Close()
+if _, err := writer.WriteAt([]byte("version2"), 0); err != nil {
+    t.Fatal(err)
+}
+if err := writer.Close(); err != nil {
+    t.Fatal(err)
+}
+
+got, err := io.ReadAll(held)
+if err != nil {
+    t.Fatal(err)
+}
+if string(got) != "version2" {
+    t.Fatalf("got %q", got)
+}
+```
+
+핸들을 열 때의 `version1`이 아니라 이후에 쓴 `version2`를 읽는다. 파일을 열어 두는 행위는 접근 대상을 붙잡지만, 그 대상의 내용을 복제하지 않는다.
+
 따라서 사전검증에서 해시를 확인하고 파일 핸들을 보관해도, 다른 writer가 같은 파일을 수정할 수 있다면 적용 시점의 바이트는 보장되지 않는다. 열린 루트는 경로 탈출을 줄이는 도구이고, 해시는 읽은 내용의 검사다. 어느 쪽도 이후의 쓰기를 멈추지 않는다. MITRE의 [CWE-367](https://cwe.mitre.org/data/definitions/367.html)은 검사와 사용 사이의 변경을 별도 위험으로 다룬다.
 
 ## '없는 파일'도 복구 세대의 일부다

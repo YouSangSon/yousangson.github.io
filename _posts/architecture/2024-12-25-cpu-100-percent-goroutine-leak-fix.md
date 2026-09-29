@@ -67,6 +67,14 @@ func main() {
 }
 ```
 
+코드를 `main.go`에 저장한 뒤 Go 1.24.5로 실행한다.
+
+```sh
+GOTOOLCHAIN=go1.24.5 go run main.go
+```
+
+출력은 다음과 같다.
+
 ```text
 bad receive: value="" ok=false
 bad receive: value="" ok=false

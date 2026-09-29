@@ -12,35 +12,43 @@ mermaid: true
 ```python
 import asyncio
 import threading
-import time
 
+started = threading.Event()
+release = threading.Event()
 finished = threading.Event()
 
 
 def blocking_work():
-    time.sleep(0.25)
+    started.set()
+    release.wait()
     finished.set()
 
 
 async def main():
     task = asyncio.create_task(asyncio.to_thread(blocking_work))
-    await asyncio.sleep(0.05)
-
-    task.cancel()
     try:
-        await task
-    except asyncio.CancelledError:
-        print("awaiting_task=cancelled")
+        while not started.is_set():
+            await asyncio.sleep(0)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            print("awaiting_task=cancelled")
 
-    print(f"thread_finished_immediately={finished.is_set()}")
-    await asyncio.sleep(0.30)
+        assert not finished.is_set()
+        print(f"thread_finished_immediately={finished.is_set()}")
+    finally:
+        release.set()
+
+    await asyncio.to_thread(finished.wait)
+    assert finished.is_set()
     print(f"thread_finished_later={finished.is_set()}")
 
 
 asyncio.run(main())
 ```
 
-실행 결과는 다음과 같았다.
+위 코드를 `cancel_demo.py`에 저장하고 `python3 cancel_demo.py`로 실행한다. `started`로 실제 스레드가 시작한 것을 확인하고, `release`를 열어 주기 전까지는 끝나지 않게 했다. 임의의 대기 시간에 기대지 않고 취소 전후의 순서를 고정한 결과다.
 
 ```text
 awaiting_task=cancelled
@@ -95,17 +103,17 @@ def upload_file():
 await asyncio.to_thread(upload_file)
 ```
 
-호출자는 취소됐지만 `requests.post()`는 응답을 받거나 300초 timeout이 발생할 때까지 실행될 수 있다. 이미 서버가 업로드를 commit했다면 그 결과도 취소로 되돌아가지 않는다.
+호출자의 취소는 이 HTTP 요청을 중단시키지 않는다. 또 `timeout=300`은 요청 전체를 300초 안에 끝낸다는 보장이 아니다. 연결·읽기 대기에 적용되는 timeout이며, 응답 바이트가 계속 도착하면 전체 시간은 더 길어질 수 있다. 전체 마감 시간이 필요하면 별도의 deadline과 실제 작업 중단 방식을 설계해야 한다. 이미 서버가 업로드를 commit했다면 그 결과도 취소로 되돌아가지 않는다. [Requests timeout 설명](https://requests.readthedocs.io/en/latest/user/quickstart/#timeouts)
 
 ## Rust: async task는 중단할 수 있지만 `spawn_blocking`은 다르다
 
 Rust 표준 라이브러리의 [`std::thread::JoinHandle`](https://doc.rust-lang.org/std/thread/struct.JoinHandle.html)은 thread를 기다리는 `join()`을 제공한다. 반대로 thread를 강제로 죽이는 안전한 표준 API는 없다. `JoinHandle`을 drop하면 thread가 종료되는 것이 아니라 detach되어 계속 실행된다.
 
-Tokio의 async task는 조금 다르다. [`JoinHandle::abort()`](https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html#method.abort)를 호출하면 task가 다음 `.await`에서 runtime에 제어권을 돌려줄 때 취소된다. task 내부의 값은 destructor를 거쳐 정리된다.
+Tokio의 async task는 조금 다르다. [`JoinHandle::abort()`](https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html#method.abort)는 task에 취소를 요청한다. Task가 `.await`에서 runtime에 제어권을 돌려주면 취소를 처리할 수 있다. 모든 `.await`가 제어권을 넘기는 것은 아니며, 취소 처리 전에 정상 완료될 수도 있다. 취소로 종료되면 task 내부의 값은 destructor를 거쳐 정리된다.
 
 ```rust
 let handle = tokio::spawn(async {
-    long_async_operation().await;
+    std::future::pending::<()>().await; // 정상 완료하지 않고 대기
 });
 
 handle.abort();
@@ -234,6 +242,8 @@ cancel intent 저장
     → 실행 상태를 cancelled로 종료
     → 실행이 소유한 자원 정리
 ```
+
+여기서 `cancelled`는 호출자의 실행 상태다. 계속 실행 중인 스레드가 파일이나 버퍼를 사용한다면, 그 자원은 **실제 작업이 끝난 뒤** 정리해야 한다. 호출자 상태 변경과 자원 반환을 같은 시점으로 잡으면 사용 중인 파일을 지우거나 메모리 예산을 너무 일찍 돌려줄 수 있다. 이 소유권 문제는 [파서 취소 예제](/posts/parser-cancellation-resource-ownership/)에서 별도로 재현한다.
 
 연결 cleanup은 취소에 같이 휩쓸리지 않도록 제한된 시간 동안 보호해야 한다. 반대로 cleanup이 실패했다고 취소된 실행을 `failed`로 뒤집어서는 안 된다. cleanup 실패는 별도의 warning과 metric으로 남기는 것이 낫다.
 

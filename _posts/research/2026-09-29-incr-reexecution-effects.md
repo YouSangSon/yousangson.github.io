@@ -60,9 +60,16 @@ Incr는 명령을 격리한 파일시스템 뷰에서 실행해 변경분을 모
 
 저자들은 14개 셸 작업에서 85번의 수정 후 재실행을 평가했다. Koala 작업을 바탕으로 하되 변경 이력은 원 개발자와의 논의, Git 이력, 수작업으로 구성한 편집을 섞었다. 각 수정 단계에서 일반 Bash와 Incr의 실행 시간을 **각각 세 번 재고 평균**으로 속도 비율을 계산했다. 실험 환경은 Ubuntu 22.04, Linux 5.15, 8코어 Xeon D-1548, 메모리 64GB, NVMe 저장소를 갖춘 CloudLab 장비 한 대다. [Incr 표 2·§8, 9–11쪽](https://www.usenix.org/system/files/osdi26-xie-yizheng.pdf#page=9)
 
-85건 가운데 **69건은 빨라지고 16건은 느려졌다.** 논문의 평균 34.2배, 최대 373.3배는 빨라진 69건에 대한 값이다. 느려진 16건의 평균 속도 비율은 0.73배다.
+85건 가운데 **69건은 빨라지고 16건은 느려졌다.** 평균을 읽기 전에 어느 집합을 평균 냈는지 나누어야 한다.
 
-처음 실행에는 아직 재사용할 결과가 없으므로 추적·격리·저장 비용이 붙는다. 5초를 넘는 작업들에서 첫 실행 시간은 Bash의 평균 2.01배였고, 캐시 크기는 전체 작업에서 원본 입력 크기의 평균 6.05배였다. 원문의 추가 최적화와 선택적 주석에 따른 개선을 기본 설정의 34.2배에 합쳐 하나의 성능 수치로 읽으면 안 된다. [Incr §8.1–8.2, 11–12쪽](https://www.usenix.org/system/files/osdi26-xie-yizheng.pdf#page=11) · [§8.4–8.5, 13쪽](https://www.usenix.org/system/files/osdi26-xie-yizheng.pdf#page=13)
+| 대상 | 원문 결과 | 분모와 의미 |
+| --- | --- | --- |
+| 빨라진 69건 | 평균 34.2배, 최대 373.3배 | 이 69건에서의 Bash/Incr 실행 시간 비율 |
+| 느려진 16건 | 평균 0.73배 | 같은 속도 비율이 1보다 작아 Incr가 더 느림 |
+| 5초를 넘는 작업의 첫 실행 | Bash 시간의 평균 2.01배 | 아직 재사용 결과가 없어 추적·격리·저장 비용을 부담 |
+| 전체 작업의 캐시 | 원본 입력 크기의 평균 6.05배 | 시간 절약과 별도로 필요한 저장 비용 |
+
+따라서 34.2배를 전체 85건의 평균이나 첫 실행의 개선으로 읽으면 안 된다. 추가 최적화와 선택적 주석에 따른 개선도 기본 설정의 값과 따로 보아야 한다. [Incr §8.1–8.2, 11–12쪽](https://www.usenix.org/system/files/osdi26-xie-yizheng.pdf#page=11) · [§8.4–8.5, 13쪽](https://www.usenix.org/system/files/osdi26-xie-yizheng.pdf#page=13)
 
 [![Incr 원문 그림 4 중 unixgame과 music의 Bash·Incr 누적 실행 시간](/assets/images/research/incr-figure4-cost-cases.png)](/assets/images/research/incr-figure4-cost-cases.png)
 
@@ -74,11 +81,13 @@ Incr는 명령을 격리한 파일시스템 뷰에서 실행해 변경분을 모
 
 별도로 parser 오류 사례 19건은 범위 밖으로 두었다. 이는 조사한 프로그램과 테스트의 호환성 근거이지, 앞 절에 적은 외부 효과나 모든 가능한 셸 프로그램에 대한 증명은 아니다. 여기서 Incr 구현이나 전체 벤치마크를 직접 재현하지는 않았다. [Incr §8.3·표 3, 12–13쪽](https://www.usenix.org/system/files/osdi26-xie-yizheng.pdf#page=12)
 
+## 느린 명령보다 먼저 실행 효과를 적는다
+
 두 논문을 나란히 읽으면 재실행 여부를 결정하기 전에 물어야 할 것이 보인다. **무엇을 실행 결과로 볼 것인가?**
 
 MapReduce의 기본 출력은 작업별로 확정되는 파일이고 보조 부수 효과는 작성자 책임이다. Incr는 명령의 스트림과 로컬 파일 효과까지 재사용 대상으로 삼지만, 감지·차단·무시·범위 밖 효과를 구분한다. 수정할 때마다 오래 걸리는 스크립트가 있다면, 먼저 느린 명령이 읽는 입력과 남기는 효과를 적어 보자. 그 효과를 관찰하고 안전하게 다시 적용할 수 있는가? 확인할 수 없다면 이전 출력이 같더라도 다음 실행을 생략하기는 어렵다.
 
-### 참고 논문
+## 참고 논문
 
 - Yizheng Xie, Evangelos Lamprou, Jerry Xia, Nikos Vasilakis, [_Incr: Faster Re-Execution via Bolt-On Incrementalization_](https://www.usenix.org/conference/osdi26/presentation/xie-yizheng), OSDI 2026, 683–699쪽, 2026년 7월.
 - Jeffrey Dean, Sanjay Ghemawat, [_MapReduce: Simplified Data Processing on Large Clusters_](https://research.google/pubs/mapreduce-simplified-data-processing-on-large-clusters/), OSDI 2004, 137–150쪽.

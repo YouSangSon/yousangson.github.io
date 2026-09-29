@@ -36,6 +36,23 @@ type Response struct {
 
 DB에서 필드가 없거나 nil로 읽혔다는 사실은 그대로 두고, **클라이언트에 보낼 응답 구조체(DTO)를 만드는 경계**에서 목록 계약을 적용할 수 있다. 단일 사용자 응답뿐 아니라 `items`가 0건인 바깥 목록, 각 항목의 중첩 목록도 그 경계에서 확인한다. 한 경로만 초기화하고 다른 목록 API를 방치하면 같은 스키마가 다시 갈라진다. 응답 모양을 고치기 위해 기존 저장 문서를 모두 마이그레이션해야 하는 것은 아니다. 저장값의 의미 자체를 바꾸는 요구가 있을 때만 별도 작업으로 검토한다.
 
+권한과 무관한 `labels` 목록으로 같은 변환을 구현하면 아래처럼 된다. 조회 실패는 이 함수에 도달하기 전에 오류로 처리하고, 성공한 빈 결과만 정규화한다.
+
+```go
+type response struct {
+    Labels []string `json:"labels"`
+}
+
+func labelsResponse(stored []string) response {
+    if stored == nil {
+        stored = []string{}
+    }
+    return response{Labels: stored}
+}
+```
+
+이 함수는 저장소 값을 쓰지 않고 응답에 사용할 슬라이스만 선택한다. `omitempty`를 붙이지 않았으므로 빈 배열도 응답에 남는다.
+
 [전체 Go 실행 예제](/assets/examples/2026-09-29/web-depth/json/main.go)를 저장해 `go run main.go`로 실행하면 실제 직렬화 결과와 아래의 PATCH 구분을 함께 확인할 수 있다.
 
 ```text
@@ -50,7 +67,7 @@ PATCH [null] and [x,null]: rejected
 PATCH [new]: {"labels":["new"]}
 ```
 
-예제에서는 쓰기 계약을 설명하기 위해 권한과 무관한 `labels` 필드를 사용한다. 처음 두 줄이 확인하는 것은 DTO의 출력 바이트다. 내부 슬라이스만 검사하면 `omitempty` 때문에 필드 자체가 사라지는 문제를 놓칠 수 있다.
+처음 두 줄이 확인하는 것은 DTO의 출력 바이트다. 내부 슬라이스만 검사하면 `omitempty` 때문에 필드 자체가 사라지는 문제를 놓칠 수 있다.
 
 ## PATCH에서는 생략과 빈 배열이 정반대다
 

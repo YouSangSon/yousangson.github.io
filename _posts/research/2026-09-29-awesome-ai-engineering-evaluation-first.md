@@ -20,7 +20,11 @@ date: 2026-09-29
 
 전체 지도를 그대로 구현하면 당장 필요 없는 부분까지 운영하게 된다. 평가할 질문을 먼저 만들고, 그 질문에 필요한 구성 요소를 찾아 읽는 순서가 낫다. 자료로 선택지를 찾은 뒤 실제 도입 여부는 해결할 실패와 근거를 보고 정하면 된다.
 
-원문: [README](https://github.com/Eric-LLMs/awesome-ai-engineering/blob/cc834a89c2d052529bca4318dfdc69f8bfd1ce4e/README.md), [전체 개념도](https://github.com/Eric-LLMs/awesome-ai-engineering/blob/cc834a89c2d052529bca4318dfdc69f8bfd1ce4e/summaries/AI-Engineering-End-to-End%20Architecture.png).
+[![AI 엔지니어링을 인프라, 데이터, 학습, 추론, 도구, 에이전트, 응용 계층으로 나눈 원문 개념도](/assets/images/research/awesome-ai-engineering-map.png)](/assets/images/research/awesome-ai-engineering-map.png)
+
+*Eric-LLMs, AI Engineering: End-to-End Architecture. [원본 그림](https://github.com/Eric-LLMs/awesome-ai-engineering/blob/cc834a89c2d052529bca4318dfdc69f8bfd1ce4e/summaries/AI-Engineering-End-to-End%20Architecture.png), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 원본 PNG를 변경 없이 실었다. 누르면 확대할 수 있다.*
+
+그림의 위쪽 녹색 영역은 에이전트의 실행 루프, 그 아래 노란 영역은 도구가 바꾸는 외부 환경이다. 오른쪽의 평가는 이 둘을 가로지른다. 이 글에서 따라갈 연결도 **도구 실행 → 환경 변화 → 결과 판정**이다. 나머지 계층과 제품명은 가능한 구성 요소를 찾는 지도이며, 모두 갖춰야 하는 필수 목록은 아니다.
 
 [![단일 응답 평가와 도구·환경을 오가는 에이전트 실행 루프를 비교한 원문 슬라이드](/assets/images/research/awesome-agent-evaluation-page3.png)](/assets/images/research/awesome-agent-evaluation-page3.png)
 
@@ -61,6 +65,26 @@ date: 2026-09-29
 ## 말과 실제 결과를 분리하는 작은 검사
 
 자료의 평가 기준을 코드로 옮기면 무엇이 달라지는지 확인해 보았다. 실제 모델을 호출하는 대신 동작이 정해진 세 함수를 사용한다. 모두 `saved`라고 답하지만, 하나는 파일을 만들지 않고, 하나는 정확히 저장하며, 마지막 하나는 정답 파일과 함께 보호할 파일까지 바꾼다. 작업의 성공 조건은 **정답 파일을 저장하면서 보호 파일을 유지하는 것**이다.
+
+평가 함수는 답변과 환경의 변화를 각각 검사한다. `action`은 임시 디렉터리를 받아 작업한 뒤 문자열을 반환하는 함수다.
+
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+def evaluate(action):
+    with TemporaryDirectory() as directory:
+        root = Path(directory)
+        protected = root / "protected.txt"
+        protected.write_text("keep")
+        reply = action(root)
+        answer = root / "answer.txt"
+        correct_output = answer.is_file() and answer.read_text() == "42\n"
+        unchanged = protected.read_text() == "keep"
+        return reply == "saved", correct_output and unchanged
+```
+
+`answer.txt`만 검사하면 보호 파일을 망가뜨린 실행도 통과한다. 성공 조건에 금지된 변경을 함께 넣으면 세 동작의 차이가 드러난다.
 
 [전체 예제](/assets/examples/2026-09-29/paper-reviews/agent_outcome_demo.py)는 Python 3 표준 라이브러리만 사용한다. 각 사례를 임시 디렉터리에서 실행하고 종료 시 지운다. 외부 API, 모델, 실제 사용자 파일은 사용하지 않는다.
 

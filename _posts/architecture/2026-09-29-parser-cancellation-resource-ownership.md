@@ -33,7 +33,17 @@ T5  첫 스레드가 파일을 읽으려다 실패한다.
 
 같은 요청 안에서도 자원마다 마지막 사용자가 다를 수 있다. worker가 입력을 메모리에 모두 읽었다는 확인을 준다면 입력 파일은 그때 지울 여지가 있다. 그러나 실행 슬롯이 제한하려는 대상이 worker 전체라면 파일을 더 읽지 않더라도 종료까지 슬롯을 보유해야 한다. 반대로 worker가 파일 경로만 받았다는 사실은 읽기가 끝났다는 확인이 아니다. 이 글의 예제는 별도의 '입력 사용 완료' 신호를 만들지 않았으므로, **worker 전체 완료**를 두 자원의 공통 해제 기준으로 삼는다. 더 세밀한 최적화는 실제로 그 신호를 제공할 때만 가능하다.
 
-## 한 파일로 반례와 수정 경로를 재현한다
+두 경로의 차이는 자원을 누가 언제까지 보유하는가에 있다.
+
+| 시점 | 호출자와 함께 정리하는 경로 | worker 종료까지 보유하는 경로 |
+| --- | --- | --- |
+| 스레드가 파일을 읽기 직전에 대기 | 파일과 슬롯을 보유 | 파일과 슬롯을 보유 |
+| 호출자에게 취소가 들어옴 | `await`를 빠져나와 파일 삭제·슬롯 반환 | `shield`로 worker의 future를 유지하고 완료 대기 |
+| 스레드의 대기를 해제함 | 이미 삭제된 파일을 읽으려 함 | 파일을 읽은 뒤 소유 Task가 정리 |
+
+아래 예제는 이 순서를 이벤트로 고정한다. `owner()` 안에 파일·슬롯·future를 함께 둔 이유는 정리 순서를 코드의 중첩 범위로 확인하기 위해서다.
+
+## 취소 시점을 고정해 두 경로를 비교한다
 
 아래 파일을 `cancellation_demo.py`로 저장하고 `python3 cancellation_demo.py`로 실행할 수 있다. 예제는 표준 라이브러리만 사용한다. `threading.Event`가 worker를 파일 읽기 직전에 붙잡고, `asyncio.Event`가 시작 및 취소 관측 시점을 알려 준다. `sleep()` 길이나 운 좋은 스케줄 순서에 기대지 않는다. 스레드에서 asyncio 이벤트를 깨울 때는 event loop의 thread-safe 호출을 사용한다. [`call_soon_threadsafe`](https://docs.python.org/3.11/library/asyncio-eventloop.html#asyncio.loop.call_soon_threadsafe)
 
@@ -134,7 +144,7 @@ worker read: ready
 
 따라서 '취소 요청을 받았다'는 상태와 '작업이 끝났다'는 상태는 별도로 기록하는 편이 정확하다. 즉시 응답 정책을 택할 수는 있지만, 그 순간에도 임시파일과 처리 슬롯은 살아 있는 worker 쪽에 남는다. 늦은 결과를 버리는 결정과 자원을 일찍 해제하는 결정은 서로 다른 문제다.
 
-## 검사가 보장하는 경계
+## 두 번째 취소와 worker 오류는 별도 처리가 필요하다
 
 `observed`는 `ThreadPoolExecutor`의 context를 빠져나간 다음 읽으므로 worker가 끝난 뒤의 결과다. 반면 수정 경로에서 최종 파일 부재를 별도 assert로 확인하지는 않는다. 삭제 시점은 `owner()`의 context 흐름과 `TemporaryDirectory`의 계약으로 설명한다. [`Executor.shutdown`](https://docs.python.org/3.11/library/concurrent.futures.html#concurrent.futures.Executor.shutdown), [`TemporaryDirectory`](https://docs.python.org/3.11/library/tempfile.html#tempfile.TemporaryDirectory)
 
