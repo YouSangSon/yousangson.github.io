@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>메시지를 꺼내도 처리가 끝난 것은 아니다</title><style>*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans)}:root{--paper:oklch(97% .018 85);--surface:oklch(94% .018 85);--ink:oklch(24% .018 55);--muted:oklch(42% .018 55);--accent:#93452d;--tint:rgba(147,69,45,.08);--rule:oklch(42% .018 55 / .28);--sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic","Segoe UI",sans-serif;--serif:Georgia,"Times New Roman","Apple SD Gothic Neo","Noto Sans KR",serif;--mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace}h1{font-family:var(--serif);font-size:28px;font-weight:400;line-height:1.4;margin:20px 24px 8px}p{font-size:14px;line-height:1.7;margin:0 24px 16px;color:var(--muted)}.diagram-container{width:100%;max-width:100%;min-width:0;overflow-x:auto}.diagram-container:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}svg{display:block;width:100%;min-width:640px;max-width:640px;margin:auto}text{font-family:var(--sans);fill:var(--ink);font-size:12px}.name{font-weight:600}.group{font-size:14px;font-weight:600}.mono{font-family:var(--mono);font-size:9px;fill:var(--muted)}.note{fill:var(--muted)}.node{fill:var(--paper);stroke:var(--rule)}.focal{fill:var(--tint);stroke:var(--accent)}.zone{fill:var(--surface);stroke:var(--rule)}.edge{fill:none;stroke:var(--muted);stroke-width:1.2}.life{stroke:var(--rule);stroke-dasharray:3,3}.mask{fill:var(--paper)}@media(prefers-color-scheme:dark){:root{--paper:oklch(20% .012 55);--surface:oklch(24% .012 55);--ink:oklch(93% .015 80);--muted:oklch(78% .018 75);--accent:#e5a387;--tint:rgba(229,163,135,.08);--rule:oklch(78% .018 75 / .28)}}@media print{.diagram-container{overflow-x:visible}svg{min-width:0;max-width:100%}}</style></head><body>
+<h1>메시지를 꺼내도 처리가 끝난 것은 아니다</h1><p>좁은 화면에서는 그림을 좌우로 움직여 볼 수 있습니다.</p>
+<div class="diagram-container" tabindex="0" role="region" aria-label="메시지 처리와 완료 기록 사이의 경계">
+<svg viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="message-title message-desc">
+<title id="message-title">메시지를 꺼내도 처리가 끝난 것은 아니다</title>
+<desc id="message-desc">수신 또는 획득, 업무 처리, 완료 기록의 세 단계. RPOP 후 중단하면 유실될 수 있고, 업무 처리 후 완료 기록 전에 중단하면 재전달 시 중복 실행될 수 있다. 복구 기록과 멱등성은 각기 다른 실패 구간을 다룬다.</desc>
+<defs><marker id="message-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--muted)"/></marker></defs>
+<rect width="100%" height="100%" fill="var(--paper)"/>
+<text x="40" y="44" class="group">정상 처리 흐름</text>
+<line class="edge" x1="184" y1="120" x2="248" y2="120" marker-end="url(#message-arrow)"/>
+<line class="edge" x1="392" y1="120" x2="456" y2="120" marker-end="url(#message-arrow)"/>
+<rect class="mask" x="40" y="88" width="144" height="64" rx="6"/>
+<rect class="node" x="40" y="88" width="144" height="64" rx="6"/>
+<text class="name" x="112" y="116" text-anchor="middle">수신 / 획득</text>
+<text class="mono" x="112" y="136" text-anchor="middle">READ / CLAIM</text>
+<rect class="mask" x="248" y="88" width="144" height="64" rx="6"/>
+<rect class="node focal" x="248" y="88" width="144" height="64" rx="6"/>
+<text class="name" x="320" y="116" text-anchor="middle">업무 처리</text>
+<text class="mono" x="320" y="136" text-anchor="middle">SIDE EFFECT</text>
+<rect class="mask" x="456" y="88" width="144" height="64" rx="6"/>
+<rect class="node" x="456" y="88" width="144" height="64" rx="6"/>
+<text class="name" x="528" y="116" text-anchor="middle">완료 기록</text>
+<text class="mono" x="528" y="136" text-anchor="middle">ACK / COMMIT</text>
+<rect class="zone" x="40" y="200" width="560" height="96" rx="8"/>
+<text x="60" y="228" class="name">RPOP 직후 중단: 큐에서 사라졌지만 아직 처리하지 않았을 수 있다.</text>
+<text x="60" y="252" class="name">처리 후 기록 전 중단: 재전달되면 같은 작업을 다시 실행할 수 있다.</text>
+<text x="60" y="278" class="note">복구 가능한 기록은 유실을, 멱등성은 중복 실행의 영향을 다룬다.</text>
+<line x1="40" y1="320" x2="600" y2="320" stroke="var(--rule)"/>
+<text x="40" y="344" class="note">화살표: 단계 순서 · 완료 기록 방식은 큐와 저장소의 계약에 따라 다름</text>
+</svg></div></body></html>

@@ -6,46 +6,30 @@ tags: [kubernetes, deployment, statefulset, k8s]
 date: 2024-02-21
 ---
 
-Deployment와 StatefulSet은 Kubernetes에서 사용되는 중요한 워크로드 리소스입니다. 두 리소스의 주요 차이점은 다음과 같습니다:
+Deployment와 StatefulSet을 고를 때는 “DB인가, 웹 서버인가”보다 먼저 물어볼 것이 있다. **Pod가 교체돼도 아무 복제본이나 같은 일을 할 수 있는가, 아니면 복제본별 식별자를 유지해야 하는가?**
 
-1. 상태 관리
-   - Deployment: 상태를 저장하지 않는 (stateless) 애플리케이션에 적합
-   - StatefulSet: 상태를 저장하는 (stateful) 애플리케이션에 적합
+## 핵심 차이
 
-2. 파드 식별자
-   - Deployment: 무작위 해시값으로 생성된 식별자 사용
-   - StatefulSet: 예측 가능하고 영구적인 식별자 사용 (예: web-0, web-1, web-2)
+| 기준 | Deployment | StatefulSet |
+| --- | --- | --- |
+| 복제본의 정체성 | 서로 교체 가능한 Pod를 관리 | `web-0`, `web-1`처럼 안정적인 식별자 유지 |
+| 저장소 | PVC를 사용할 수 있음 | `volumeClaimTemplates`로 복제본별 PVC 구성 가능 |
+| 네트워크 | 보통 Service로 복제본 집합에 접근 | Headless Service와 함께 복제본별 안정적인 이름 사용 |
+| 생성·축소 순서 | 복제본별 순서를 보장하는 모델이 아님 | 기본 `OrderedReady` 정책에서 순서 관리 |
+| 업데이트 | RollingUpdate 또는 Recreate | RollingUpdate 또는 OnDelete |
 
-3. 스케일링 순서
-   - Deployment: 무작위 순서로 스케일링
-   - StatefulSet: 순차적으로 스케일링 (0 → 1 → 2 순서로 생성, 역순으로 삭제)
+Deployment도 영구 볼륨을 사용할 수 있다. “Deployment는 임시 저장소, StatefulSet은 영구 저장소”로 나누면 선택 기준을 잘못 잡게 된다. StatefulSet의 특징은 각 복제본의 식별자와 저장소 연결을 유지하는 데 있다. [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/), [StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/)
 
-4. 네트워크 식별자
-   - Deployment: 서비스를 통해 로드밸런싱된 단일 IP 제공
-   - StatefulSet: 각 파드에 대해 안정적인 네트워크 식별자 제공
+## StatefulSet이 보장하지 않는 것
 
-5. 스토리지
-   - Deployment: 일반적으로 임시 스토리지 사용
-   - StatefulSet: 영구적인 스토리지 볼륨을 각 파드에 연결 가능
+Pod가 다시 만들어져도 이름은 유지할 수 있지만 Pod UID와 IP까지 같다는 뜻은 아니다. 안정적인 네트워크 이름과 현재 실행 인스턴스를 구분해야 한다.
 
-6. 업데이트 전략
-   - Deployment: 롤링 업데이트 또는 Recreate 전략 사용
-   - StatefulSet: 순차적인 업데이트 (파드를 하나씩 업데이트)
+또한 StatefulSet을 사용한다고 데이터 복제, 리더 선출, 백업이 자동으로 구현되지는 않는다. 데이터베이스나 메시지 브로커가 필요로 하는 복제 프로토콜과 복구 절차는 그 시스템의 책임이다.
 
-7. 사용 사례
-   - Deployment: 웹 서버, API 서버 등 상태를 저장하지 않는 애플리케이션
-   - StatefulSet: 데이터베이스, 분산 캐시, 메시지 큐 등 상태를 유지해야 하는 애플리케이션
+기본 순서 정책도 절대적인 제약은 아니다. `podManagementPolicy: Parallel`을 선택하면 생성·축소 때 다른 Pod가 Ready가 되기를 기다리는 동작이 달라진다. 업데이트 전략과 Pod 관리 정책은 구분해서 읽어야 한다.
 
-8. 파드 교체
-   - Deployment: 파드를 쉽게 교체 가능
-   - StatefulSet: 파드의 지속성을 보장, 같은 ID로 재생성
+## 선택을 확인하는 질문
 
-9. 헤드리스 서비스
-   - Deployment: 일반적으로 ClusterIP 서비스 사용
-   - StatefulSet: 주로 헤드리스 서비스와 함께 사용하여 각 파드에 대한 DNS 엔트리 제공
+API 서버의 모든 복제본이 외부 DB에 연결하고 어느 Pod가 요청을 받아도 된다면 Deployment가 자연스럽다. 반면 복제본별 디스크와 이름을 다른 멤버가 식별해야 한다면 StatefulSet을 검토한다.
 
-10. 롤백
-    - Deployment: 쉽게 이전 버전으로 롤백 가능
-    - StatefulSet: 롤백이 더 복잡하고 수동 개입이 필요할 수 있음
-
-이러한 차이점 때문에, 애플리케이션의 특성에 따라 적절한 리소스를 선택해야 합니다. 상태를 저장하지 않는 애플리케이션은 Deployment를, 상태를 저장하고 순차적인 처리가 필요한 애플리케이션은 StatefulSet을 사용하는 것이 일반적입니다.
+마지막으로 Pod 하나를 지우고 다시 만들었을 때를 생각해 보자. 유지해야 하는 것이 서비스 전체의 접근 주소인지, 특정 멤버의 이름과 저장소인지 설명할 수 있으면 선택 근거도 분명해진다.

@@ -161,6 +161,8 @@ html.dark .heti pre span {
 }
 .heti :where(th, td) {
   --at-apply: 'border-b border-b-secondary/25 px-3 pb-1.5';
+  overflow-wrap: normal;
+  word-break: keep-all;
 }
 .heti tr :where(td:first-child, th:first-child) {
   --at-apply: 'pl-0';

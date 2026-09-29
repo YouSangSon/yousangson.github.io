@@ -1,419 +1,52 @@
 ---
 title: 파일 업로드 락 세분화 - Redis 분산 락 + MongoDB 트랜잭션 재시도
-description: 동시 파일 업로드 시 발생하는 MongoDB WriteConflict를 Redis 분산 락과 트랜잭션 재시도로 해결하고, 파일 크기별 락 세분화로 대용량 파일이 소용량 파일을 차단하지 않도록 개선한 경험
+description: 파일 크기별 업로드 락이 공유 메타데이터까지 보호하지는 않는 이유와 TTL, 재시도, MinIO 정리 경계를 설명한다.
 categories: [architecture, golang]
 tags: [redis, distributed lock, mongodb, write conflict, concurrency, golang]
 date: 2025-02-05
 mermaid: true
 ---
 
-## 문제의 발견
+큰 파일 하나를 올리는 동안 작은 파일도 기다리는 문제를 줄이려고 업로드 락을 파일 크기별로 나눴다. 하지만 락을 잘게 나눈 뒤에도 모든 요청이 같은 사용자 문서의 `file_ids`를 수정했다. **대기를 줄이는 기준과 데이터를 보호하는 기준을 같은 키에 섞은 것**이 한계였다.
 
-사용자들이 여러 파일을 동시에 업로드할 때 간헐적으로 실패가 발생했다.
+> 2026-09-29 보완: 기존의 “크기별 락으로 동시 접근을 원천 차단한다”는 설명을 수정했다. 앞선 [업로드 동시성 제어 글](/posts/file-upload-concurrency-control/)과 함께 읽으면 원래 문제와 후속 한계를 이어서 볼 수 있다.
 
-> "파일 10개 업로드했는데 3개만 성공했어요."
+## 서로 다른 락을 잡으면 동시에 진입한다
 
-로그를 분석해보니 **MongoDB WriteConflict** 에러였다.
+예를 들어 다음 두 키는 별개의 락이다.
 
-```
-WriteConflict: this operation conflicted with another operation
-```
-
-동일 사용자의 `file_ids` 배열을 동시에 업데이트하면서 충돌이 발생하고 있었다.
-
-## 문제 상황
-
-### WriteConflict 발생 시나리오
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Server1 as 요청 1
-    participant Server2 as 요청 2
-    participant MongoDB
-
-    Client->>Server1: 파일 A 업로드
-    Client->>Server2: 파일 B 업로드 (동시)
-
-    Server1->>MongoDB: 트랜잭션 시작
-    Server2->>MongoDB: 트랜잭션 시작
-
-    Server1->>MongoDB: user.file_ids에 A 추가
-    Server2->>MongoDB: user.file_ids에 B 추가
-
-    Note over MongoDB: 같은 문서 동시 수정!
-
-    MongoDB-->>Server1: Success
-    MongoDB-->>Server2: WriteConflict!
-
-    Server1->>MongoDB: Commit
-    Server2-->>Client: 500 Error
+```text
+user_file_upload_lock:{userID}:small
+user_file_upload_lock:{userID}:large
 ```
 
-### 영향 범위
+작은 파일과 큰 파일의 전송을 겹쳐 진행할 수 있지만, 같은 사용자 메타데이터까지 직렬화하지는 않는다. 최종 갱신이 같은 문서에 모이면 여전히 충돌할 수 있다.
 
-| 작업 | 충돌 발생 조건 |
-|-----|--------------|
-| 파일 업로드 | 동일 사용자가 여러 파일 동시 업로드 |
-| 파일 추가 | 동일 세션/에이전트에 여러 파일 동시 추가 |
-| Agent Configuration | 동일 에이전트 설정 동시 변경 |
-| MCP/ToolSet 활성화 | 여러 에이전트 동시 업데이트 |
+| 구간 | 제한·보호 기준 |
+| --- | --- |
+| HTTP 본문 수신과 임시 파일 생성 | 요청 수, 바이트 수, 디스크·메모리 여유 |
+| MinIO 전송 | SDK 버퍼 크기와 동시 전송 수 |
+| 사용자·세션의 파일 참조 갱신 | 실제로 함께 변경되는 공유 상태 |
+| 실패 객체 정리 | 정확한 객체 버전과 정리 권한 |
 
-## 해결책: 분산 락 + 트랜잭션 재시도
+업로드 전체를 전역 락으로 감쌀 필요는 없다. 그렇다고 공유 문서 갱신까지 파일별로 독립이라고 가정해서도 안 된다. 보호할 상태를 먼저 정하고, 그 구간을 가능한 짧게 만드는 순서가 중요하다.
 
-### 전체 아키텍처
+## TTL과 재시도는 만료 이후까지 본다
 
-```mermaid
-flowchart TD
-    A[파일 업로드 요청] --> B{Redis 락 획득 시도}
-    B -->|실패| C[자동 재시도]
-    C -->|30초 초과| D[Timeout 에러]
-    B -->|성공| E[MongoDB 트랜잭션]
-    E --> F{WriteConflict?}
-    F -->|Yes| G{재시도 3회 미만?}
-    G -->|Yes| H[Exponential Backoff]
-    H --> E
-    G -->|No| I[에러 반환]
-    F -->|No| J[Success]
-    J --> K[Redis 락 해제]
-```
+락 TTL이 5분인데 작업이 10분 걸리면 중간에 다른 요청이 같은 락을 잡을 수 있다. TTL은 작업을 강제로 종료하는 시간이 아니다. 갱신과 해제에서 소유자를 확인하고, 소유권을 잃은 작업의 쓰기를 어떻게 막을지 정해야 한다. [TTL 자동 갱신의 소유권 경계](/posts/distributed-lock-ttl-auto-renewal/)
 
-### 1. Redis 분산 락 (Pessimistic Locking)
+재시도 횟수도 구분해야 한다. 최초 실행을 포함한 시도 횟수인지, 실패 후 추가 실행 횟수인지 명시한다. `attempt² × 50ms`는 제곱 형태의 증가이며 지수 백오프가 아니다. 기존 글에서 두 표현을 섞은 부분도 바로잡았다.
 
-{% raw %}
-```go
-func (s *fileService) acquireUserFileUploadLock(ctx context.Context, lockKey string) (bool, error) {
-    if s.services.Cache == nil {
-        return true, nil  // Graceful degradation
-    }
+MongoDB 드라이버가 제공하는 트랜잭션 재시도와 호출자의 재시도를 함께 사용할 때는 총 시간 제한과 외부 부수 효과의 중복을 확인한다. [Go 드라이버 트랜잭션 문서](https://www.mongodb.com/docs/drivers/go/current/crud/transactions/)
 
-    lockValue := time.Now().UTC().Format(time.RFC3339Nano)
-    ttl := 5 * time.Minute
+## 고아 객체 기록은 삭제 완료가 아니다
 
-    maxWaitTime := 30 * time.Second
-    initialBackoff := 100 * time.Millisecond
-    maxBackoff := 2 * time.Second
-    backoff := initialBackoff
-    startTime := time.Now()
+MinIO 삭제 실패를 기록하면 복구를 이어 갈 근거가 생긴다. 그러나 기록 저장 실패, 재시도 한도 초과, 같은 키의 새 객체 생성까지 처리해야 정리의 결과를 설명할 수 있다.
 
-    for {
-        // Context deadline 체크
-        if ctx.Err() != nil {
-            return false, customErrors.Wrap("context cancelled", ctx.Err())
-        }
+객체 키와 버전을 함께 고정하고, 다른 참조나 진행 중인 writer가 있는지 확인해야 한다. [RAG 파이프라인의 불변 버전](/posts/immutable-versions-through-rag-pipeline/)은 파일 참조와 실제 처리 대상이 어긋나는 문제를 설명한다.
 
-        // 최대 대기 시간 체크
-        if time.Since(startTime) > maxWaitTime {
-            return false, customErrors.New(customErrors.ErrTimeout,
-                "lock acquisition timeout: failed to acquire lock within 30 seconds", nil)
-        }
+## 다음에 업로드 제한을 설계한다면
 
-        // 락 획득 시도
-        acquired, err := s.services.Cache.SetNX(lockKey, lockValue, ttl)
-        if err != nil {
-            return false, customErrors.Wrap("failed to set lock", err)
-        }
-        if acquired {
-            return true, nil
-        }
+락 키부터 추가하지 말고 요청이 처음 큰 자원을 할당하는 위치를 찾는다. [MinIO 버퍼 사례](/posts/upload-memory-admission-before-body/)처럼 진입 제한보다 앞에서 버퍼가 생기면 동시 실행 수만 줄여서는 메모리를 보호하지 못한다.
 
-        // Exponential backoff로 대기 후 재시도
-        time.Sleep(backoff)
-        backoff = time.Duration(float64(backoff) * 1.5)
-        if backoff > maxBackoff {
-            backoff = maxBackoff
-        }
-    }
-}
-```
-{% endraw %}
-
-### 2. MongoDB 트랜잭션 재시도 (Optimistic Locking)
-
-{% raw %}
-```go
-func (s *fileService) uploadUserFileInternal(ctx context.Context, ...) (*models.File, error) {
-    // 1. 락 획득
-    lockKey := s.generateUserFileUploadLockKey(userID, fileSize)
-    lockAcquired, err := s.acquireUserFileUploadLock(ctx, lockKey)
-    if err != nil {
-        return nil, err
-    }
-    defer s.releaseUserFileUploadLock(lockKey)
-
-    // 2. MongoDB 트랜잭션 재시도 로직
-    maxRetries := 3
-    var lastErr error
-
-    for attempt := 0; attempt < maxRetries; attempt++ {
-        if attempt > 0 {
-            // Exponential backoff: 1² × 50ms, 2² × 50ms, 3² × 50ms
-            waitTime := time.Duration(attempt*attempt) * 50 * time.Millisecond
-            time.Sleep(waitTime)
-            s.logger.Debugf("retrying file upload (attempt %d/%d)", attempt+1, maxRetries)
-        }
-
-        session, err := s.services.MongoDB.StartSession()
-        if err != nil {
-            return nil, customErrors.Wrap("failed to start session", err)
-        }
-        defer session.EndSession(ctx)
-
-        _, err = session.WithTransaction(ctx, func(mongoCtx mongo.SessionContext) (any, error) {
-            // 파일 삽입, 권한 생성, file_ids 업데이트
-            return nil, nil
-        })
-
-        if err != nil {
-            lastErr = err
-            if strings.Contains(err.Error(), "WriteConflict") {
-                if attempt < maxRetries-1 {
-                    continue  // 재시도
-                }
-            }
-            return nil, customErrors.Wrap("failed to upload file", err)
-        }
-
-        break  // 성공
-    }
-
-    return file, nil
-}
-```
-{% endraw %}
-
-### 3. 파일 크기별 락 세분화
-
-{% raw %}
-```go
-// 파일 크기 분류
-func getFileSizeCategory(fileSize int64) string {
-    const (
-        smallLimit  = 10 * 1024 * 1024   // 10MB
-        mediumLimit = 100 * 1024 * 1024  // 100MB
-    )
-
-    if fileSize <= smallLimit {
-        return "small"
-    } else if fileSize <= mediumLimit {
-        return "medium"
-    }
-    return "large"
-}
-
-// 락 키 생성
-func (s *fileService) generateUserFileUploadLockKey(userID string, fileSize int64) string {
-    category := getFileSizeCategory(fileSize)
-    return fmt.Sprintf("user_file_upload_lock:%s:%s", userID, category)
-}
-```
-{% endraw %}
-
-**효과:**
-- `user_file_upload_lock:user123:small` - 5MB 파일
-- `user_file_upload_lock:user123:medium` - 50MB 파일
-- `user_file_upload_lock:user123:large` - 200MB 파일
-
-**대용량 파일(10분 처리)이 소용량 파일(1초 처리)을 차단하지 않음**
-
-## 락 레벨별 적용
-
-### 락 키 전략
-
-| 작업 | 락 키 | 레벨 |
-|-----|------|-----|
-| 파일 업로드 | `user_file_upload_lock:{userID}:{size}` | 사용자 + 크기 |
-| 세션 파일 추가 | `session_file_add_lock:{sessionID}` | 세션 |
-| 에이전트 파일 추가 | `agent_file_add_lock:{agentID}` | 에이전트 |
-| Agent Configuration | `agent_config_lock:{agentID}` | 에이전트 |
-| MCP 에이전트 업데이트 | `user_mcp_agent_update_lock:{userID}` | 사용자 |
-
-### 락 획득 흐름
-
-```mermaid
-flowchart TD
-    A[락 키 생성] --> B{Redis SET NX}
-    B -->|성공| C[락 획득]
-    B -->|실패| D{30초 경과?}
-    D -->|No| E[Backoff 대기]
-    E --> B
-    D -->|Yes| F[Timeout 에러]
-
-    C --> G[작업 진행]
-    G --> H[defer 락 해제]
-```
-
-## MinIO 고아 객체 관리
-
-### 문제
-
-파일 업로드 실패 시 MinIO에 업로드된 파일이 삭제되지 않고 남아있는 경우가 있다.
-
-### 해결책
-
-{% raw %}
-```go
-// MinIO 삭제 실패 시 고아 객체 기록
-func (s *fileService) recordOrphanMinIOObject(ctx context.Context, bucketID, objectKey string, err error) {
-    orphan := &models.OrphanMinIOObject{
-        ID:        uuid.New().String(),
-        BucketID:  bucketID,
-        ObjectKey: objectKey,
-        Status:    "pending",
-        Retries:   0,
-        Error:     err.Error(),
-        CreatedAt: time.Now(),
-    }
-
-    s.services.MongoDB.Collection(models.CollOrphanMinIOObjects).InsertOne(ctx, orphan)
-}
-
-// 배치 작업으로 주기적 정리 (1시간 간격)
-func (s *fileService) CleanupOrphanMinIOObjects(ctx context.Context) error {
-    // 재시도 대상: retries < 3, 마지막 재시도가 1시간 이상 경과
-    filter := bson.M{
-        "status":  bson.M{"$in": []string{"pending", "retrying"}},
-        "retries": bson.M{"$lt": 3},
-        "$or": []bson.M{
-            {"last_retry_at": bson.M{"$exists": false}},
-            {"last_retry_at": bson.M{"$lt": time.Now().Add(-1 * time.Hour)}},
-        },
-    }
-
-    orphans, _ := s.getOrphanObjects(ctx, filter)
-
-    for _, orphan := range orphans {
-        if err := s.services.MinIO.DeleteObject(ctx, orphan.BucketID, orphan.ObjectKey); err != nil {
-            s.updateOrphanStatus(ctx, orphan.ID, "retrying", orphan.Retries+1, err)
-        } else {
-            s.updateOrphanStatus(ctx, orphan.ID, "deleted", orphan.Retries, nil)
-        }
-    }
-
-    return nil
-}
-```
-{% endraw %}
-
-## 설정값
-
-| 설정 | 값 | 설명 |
-|-----|---|-----|
-| 락 TTL | 5분 | 데드락 방지 |
-| 락 획득 타임아웃 | 30초 | 최대 대기 시간 |
-| 초기 Backoff | 100ms | 첫 재시도 대기 |
-| 최대 Backoff | 2초 | 최대 재시도 대기 |
-| 트랜잭션 재시도 | 3회 | WriteConflict 재시도 |
-
-## 에러 처리 전략
-
-```mermaid
-flowchart TD
-    A[에러 발생] --> B{에러 타입}
-
-    B -->|락 획득 타임아웃| C[408 Timeout]
-    B -->|WriteConflict| D{재시도 3회 미만?}
-    D -->|Yes| E[Exponential Backoff]
-    E --> F[트랜잭션 재시도]
-    D -->|No| G[500 Error]
-    B -->|Redis 연결 에러| H{환경?}
-    H -->|운영| I[503 Service Unavailable]
-    H -->|개발| J[Graceful Degradation]
-```
-
-## 결과
-
-### 성능 개선
-
-| 지표 | Before | After |
-|-----|--------|-------|
-| WriteConflict 발생률 | 30% | 0.1% |
-| 동시 업로드 성공률 | 70% | 99.9% |
-| 평균 응답 시간 | 변동 큼 | 안정적 |
-
-### 로그 변화
-
-**수정 전:**
-```
-[15:23:45] UploadFile: WriteConflict
-[15:23:45] UploadFile: WriteConflict
-[15:23:45] UploadFile: WriteConflict
-(10개 중 3개만 성공)
-```
-
-**수정 후:**
-```
-[15:23:45] Lock acquired: user123:small
-[15:23:46] Upload completed: file1
-[15:23:46] Lock released: user123:small
-[15:23:46] Lock acquired: user123:small
-[15:23:47] Upload completed: file2
-...
-(10개 모두 성공)
-```
-
-## 배운 점
-
-### 1. 분산 락 + 트랜잭션 재시도 결합
-
-{% raw %}
-```go
-// 분산 락만으로는 부족
-// → 락 내부에서도 WriteConflict 발생 가능
-
-// 트랜잭션 재시도만으로는 부족
-// → 동시 요청이 많으면 재시도 횟수 초과
-
-// 둘 다 사용
-lock := acquireLock(key)
-defer releaseLock(lock)
-
-for attempt := 0; attempt < maxRetries; attempt++ {
-    err := runTransaction()
-    if !isWriteConflict(err) {
-        break
-    }
-    sleep(backoff)
-}
-```
-{% endraw %}
-
-### 2. 파일 크기별 락 세분화
-
-{% raw %}
-```go
-// 안티패턴: 단일 락
-lock := "user_upload_lock:" + userID
-// → 10GB 파일이 1KB 파일 차단
-
-// 올바른 패턴: 크기별 락
-lock := fmt.Sprintf("user_upload_lock:%s:%s", userID, sizeCategory)
-// → 대용량 파일이 소용량 파일 차단 안 함
-```
-{% endraw %}
-
-### 3. Graceful Degradation
-
-{% raw %}
-```go
-func acquireLock(key string) (bool, error) {
-    if cache == nil {
-        // Redis 없으면 락 없이 진행
-        // 동시성 제어 효과는 감소하지만 서비스는 유지
-        return true, nil
-    }
-    // ...
-}
-```
-{% endraw %}
-
-## 결론
-
-파일 업로드 동시성 제어의 핵심:
-
-1. **Redis 분산 락:** 동시 접근 원천 차단
-2. **트랜잭션 재시도:** 일시적 충돌 해결
-3. **파일 크기별 세분화:** 대용량이 소용량 차단 방지
-4. **고아 객체 관리:** 실패 시 MinIO 정리 보장
-
-**동시성 제어는 "차단"이 아니라 "순서 보장"이다.**
+검증은 작은 파일과 큰 파일을 섞어 수행하고, 락 만료와 저장 실패도 포함한다. 기존 글의 99.9% 성공률은 재현 조건이 첨부되지 않아 이번 보완에서 성능 근거로 사용하지 않았다.

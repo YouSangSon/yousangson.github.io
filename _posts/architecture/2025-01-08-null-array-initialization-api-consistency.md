@@ -7,341 +7,68 @@ date: 2025-01-08
 mermaid: true
 ---
 
-## 문제의 발견
+API 응답의 배열이 어떤 요청에서는 `[]`, 다른 요청에서는 `null`로 돌아왔다. 프론트엔드에서 `user.roles.map(...)`을 호출하면 두 번째 경우에 오류가 났다. 먼저 정할 것은 **이 API에서 값이 없다는 뜻을 어떻게 표현할 것인가**였다.
 
-프론트엔드 개발자로부터 버그 리포트가 들어왔다.
+## null과 빈 배열의 의미를 먼저 정한다
 
-> "가끔 앱이 크래시해요. `Cannot read properties of null (reading 'map')` 에러가 나요."
+항상 목록을 반환하는 필드라면 항목이 없어도 `[]`를 반환하는 계약이 편하다. 반대로 `null`이 “아직 계산하지 않음”이나 “값을 알 수 없음”을 뜻한다면 무조건 빈 배열로 바꿔서는 안 된다.
 
-API 응답을 확인해보니 같은 엔드포인트가 이렇게 다른 응답을 반환하고 있었다.
+| 응답 | 계약에서 정할 의미 |
+| --- | --- |
+| `[]` | 목록은 유효하지만 항목이 없음 |
+| `null` | 필드 계약에 따라 미설정·알 수 없음 등 |
+| 필드 생략 | 해당 응답에 필드가 없는 상태 |
 
-**정상 케이스:**
-```json
-{
-  "id": "user123",
-  "name": "홍길동",
-  "roles": ["admin", "user"],
-  "file_ids": ["file1", "file2"]
-}
-```
+이 글의 사례는 역할과 파일 목록을 빈 배열로 반환하기로 한 API다. 권한 조회 실패를 빈 역할 목록으로 숨기는 처리는 포함하지 않는다.
 
-**문제 케이스:**
-```json
-{
-  "id": "user456",
-  "name": "김철수",
-  "roles": null,
-  "file_ids": null
-}
-```
+## Go 1.24.5에서 직렬화 확인하기
 
-프론트엔드에서 이렇게 사용하면 크래시가 발생한다.
+Go의 `encoding/json`은 nil 슬라이스를 `null`로 인코딩한다. 길이가 0인 non-nil 슬라이스는 `[]`가 된다. 다음 예제는 **Go 1.24.5**에서 두 결과를 확인한다. [Go 1.24.5 JSON 인코더](https://github.com/golang/go/blob/go1.24.5/src/encoding/json/encode.go)
 
-{% raw %}
-```javascript
-// 프론트엔드 코드
-const roleList = user.roles.map(role => role.toUpperCase());
-// TypeError: Cannot read properties of null (reading 'map')
-```
-{% endraw %}
-
-## 왜 Null이 반환되는가?
-
-MongoDB에서 배열 필드가 null인 상황:
-
-1. **문서 생성 시 배열 필드 미설정**
-2. **명시적으로 null 저장**
-3. **필드가 아예 존재하지 않음** (Go에서는 nil로 디코딩)
-
-{% raw %}
 ```go
-// Go struct
-type User struct {
-    ID      string   `bson:"_id"`
-    Name    string   `bson:"name"`
-    Roles   []string `bson:"roles"`   // MongoDB에 없으면 nil
-    FileIds []string `bson:"file_ids"`
-}
+package main
 
-// MongoDB에서 조회
-var user User
-collection.FindOne(ctx, filter).Decode(&user)
-
-// user.Roles가 nil일 수 있음!
-```
-{% endraw %}
-
-## 해결책: 조회 함수에서 Null 체크
-
-### 패턴 정의
-
-모든 조회 함수에서 배열 필드를 체크하고 초기화한다.
-
-{% raw %}
-```go
-// 조회 후 null 체크 패턴
-func (s *userService) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
-    var user models.User
-    err := s.collection.FindOne(ctx, bson.M{"_id": userID}).Decode(&user)
-    if err != nil {
-        return nil, err
-    }
-
-    // Null 배열 초기화
-    if user.Roles == nil {
-        user.Roles = []string{}
-    }
-    if user.FileIds == nil {
-        user.FileIds = []string{}
-    }
-    if user.OrgRoles == nil {
-        user.OrgRoles = []models.OrgRole{}
-    }
-
-    return &user, nil
-}
-```
-{% endraw %}
-
-### 헬퍼 함수로 추상화
-
-{% raw %}
-```go
-// 헬퍼 함수
-func initializeUserArrays(user *models.User) {
-    if user.Roles == nil {
-        user.Roles = []string{}
-    }
-    if user.FileIds == nil {
-        user.FileIds = []string{}
-    }
-    if user.OrgRoles == nil {
-        user.OrgRoles = []models.OrgRole{}
-    }
-}
-
-// 사용
-func (s *userService) GetUserByID(ctx context.Context, userID string) (*models.User, error) {
-    var user models.User
-    err := s.collection.FindOne(ctx, bson.M{"_id": userID}).Decode(&user)
-    if err != nil {
-        return nil, err
-    }
-
-    initializeUserArrays(&user)
-    return &user, nil
-}
-```
-{% endraw %}
-
-## 적용 대상 모델
-
-### 주요 모델과 배열 필드
-
-| 모델 | 배열 필드 |
-|-----|----------|
-| User | `Roles`, `OrgRoles`, `FileIds` |
-| Agent | `Tags`, `FileIds`, `McpServerIds`, `SubAgentIds`, `ToolSetIds` |
-| Session | `Messages`, `Tags`, `FileIds` |
-| Configuration | `McpConfig`, `ToolSetConfig`, `SubAgentConfig` |
-| Organization | `Settings.AllowedRoles` |
-| Team | `Members` |
-
-### Agent 서비스 예시
-
-{% raw %}
-```go
-func initializeAgentArrays(agent *models.Agent) {
-    if agent.Tags == nil {
-        agent.Tags = []string{}
-    }
-    if agent.FileIds == nil {
-        agent.FileIds = []string{}
-    }
-    if agent.McpServerIds == nil {
-        agent.McpServerIds = []string{}
-    }
-    if agent.SubAgentIds == nil {
-        agent.SubAgentIds = []string{}
-    }
-    if agent.ToolSetIds == nil {
-        agent.ToolSetIds = []string{}
-    }
-}
-
-func (s *agentService) GetAgent(ctx context.Context, agentID string) (*models.Agent, error) {
-    var agent models.Agent
-    err := s.collection.FindOne(ctx, bson.M{"_id": agentID}).Decode(&agent)
-    if err != nil {
-        return nil, err
-    }
-
-    initializeAgentArrays(&agent)
-    return &agent, nil
-}
-```
-{% endraw %}
-
-### 중첩 구조체 처리
-
-{% raw %}
-```go
-// 중첩된 배열 필드도 체크
-func initializeOrganizationArrays(org *models.Organization) {
-    if org.Settings.AllowedRoles == nil {
-        org.Settings.AllowedRoles = []string{}
-    }
-}
-
-func initializeAlarmArrays(alarm *models.Alarm) {
-    if alarm.Tags == nil {
-        alarm.Tags = []string{}
-    }
-    if alarm.Channels == nil {
-        alarm.Channels = []string{}
-    }
-    // 중첩 구조체 내부의 배열
-    if alarm.RichContent != nil && alarm.RichContent.Attachments == nil {
-        alarm.RichContent.Attachments = []models.AlarmAttachment{}
-    }
-}
-```
-{% endraw %}
-
-## 리스트 조회 함수에도 적용
-
-단일 조회뿐 아니라 리스트 조회에도 적용해야 한다.
-
-{% raw %}
-```go
-func (s *agentService) GetAgents(ctx context.Context, userID string) ([]models.Agent, error) {
-    cursor, err := s.collection.Find(ctx, bson.M{"created_by": userID})
-    if err != nil {
-        return nil, err
-    }
-    defer cursor.Close(ctx)
-
-    var agents []models.Agent
-    if err := cursor.All(ctx, &agents); err != nil {
-        return nil, err
-    }
-
-    // 각 Agent에 대해 null 체크
-    for i := range agents {
-        initializeAgentArrays(&agents[i])
-    }
-
-    return agents, nil
-}
-```
-{% endraw %}
-
-## API 응답 변화
-
-```mermaid
-flowchart LR
-    A[MongoDB 조회] --> B{배열 필드 null?}
-    B -->|Yes| C["빈 배열로 초기화 []"]
-    B -->|No| D[기존 값 유지]
-    C --> E[API 응답]
-    D --> E
-```
-
-**Before:**
-```json
-{
-  "id": "user456",
-  "roles": null,
-  "file_ids": null
-}
-```
-
-**After:**
-```json
-{
-  "id": "user456",
-  "roles": [],
-  "file_ids": []
-}
-```
-
-## 왜 DB 레벨에서 안 하는가?
-
-### MongoDB 기본값 설정의 한계
-
-MongoDB는 스키마리스이므로 Go 코드에서 기본값을 지정해도 기존 문서에는 적용되지 않는다.
-
-{% raw %}
-```go
-// Go struct 기본값은 새 문서 생성 시에만 적용
-type User struct {
-    Roles []string `bson:"roles" default:"[]"`  // 의미 없음
-}
-```
-{% endraw %}
-
-### 마이그레이션 비용
-
-기존 데이터를 모두 업데이트하는 것은 비용이 크다.
-
-{% raw %}
-```javascript
-// 수백만 건의 문서를 업데이트해야 함
-db.users.updateMany(
-  { roles: null },
-  { $set: { roles: [] } }
+import (
+    "encoding/json"
+    "fmt"
 )
+
+func main() {
+    type Response struct {
+        Roles []string `json:"roles"`
+    }
+    for _, tc := range []struct {
+        roles []string
+        want  string
+    }{
+        {nil, `{"roles":null}`},
+        {[]string{}, `{"roles":[]}`},
+    } {
+        got, err := json.Marshal(Response{Roles: tc.roles})
+        if err != nil || string(got) != tc.want {
+            panic("unexpected JSON result")
+        }
+        fmt.Println(string(got))
+    }
+}
 ```
-{% endraw %}
 
-**결론:** 애플리케이션 레벨에서 처리하는 것이 안전하고 유연하다.
+`omitempty`를 붙이면 빈 슬라이스가 필드 생략으로 바뀔 수 있으므로 응답 계약과 함께 확인해야 한다. MongoDB의 `bson` 태그만으로 JSON 필드명이나 생략 규칙이 정해지는 것도 아니다.
 
-## 프론트엔드 개발자 경험 개선
+## 응답을 만드는 경계에서 정규화한다
 
-### Before (방어적 프로그래밍 필요)
+DB 조회가 성공한 뒤 응답 DTO를 만들 때 nil 목록을 빈 슬라이스로 초기화할 수 있다. 단일 항목 조회와 목록 조회가 같은 변환을 사용하면 경로별 차이를 줄일 수 있다.
 
-{% raw %}
-```javascript
-// 프론트엔드에서 매번 체크해야 함
-const roleList = (user.roles || []).map(role => role.toUpperCase());
-const fileCount = user.file_ids?.length ?? 0;
-```
-{% endraw %}
+목록 안의 각 객체뿐 아니라 **바깥 목록 자체**도 확인한다. 결과가 0건일 때 `var items []Item`을 그대로 반환하면 `null`이 될 수 있다. 중첩 객체는 nil 여부를 먼저 확인하고 그 안의 배열을 처리한다.
 
-### After (안전하게 사용 가능)
+응답 형식을 맞추려는 목적이라면 기존 DB 문서를 모두 바꾸는 마이그레이션까지 바로 필요하지는 않다. 저장 데이터의 의미를 바꿔야 하는 작업과 응답 표현을 통일하는 작업은 구분한다.
 
-{% raw %}
-```javascript
-// null 걱정 없이 사용
-const roleList = user.roles.map(role => role.toUpperCase());
-const fileCount = user.file_ids.length;
-```
-{% endraw %}
+## 프론트엔드에서 사라지는 검사와 남는 검사
 
-## 체크리스트
+배열을 보장하면 정상 응답마다 반복하던 null fallback은 줄일 수 있다. HTTP 실패, 잘못된 응답 스키마, 아직 로딩 중인 상태까지 검사가 불필요해지는 것은 아니다.
 
-API 응답 일관성을 보장하기 위한 체크리스트:
+또한 올바른 형태의 응답이라도 이미 떠난 화면의 결과일 수 있다. [비동기 응답의 범위와 세대 번호](/posts/frontend-async-result-scope-and-generation/)에서는 늦게 도착한 응답을 현재 화면에 적용해도 되는지 검사한다. 응답 형태와 응답을 사용할 시점은 별개의 계약이다.
 
-1. **모델 정의 검토**: 배열 필드 목록 작성
-2. **조회 함수 식별**: `Get*`, `List*`, `Find*` 함수들
-3. **헬퍼 함수 작성**: 모델별 `initialize*Arrays` 함수
-4. **단일 조회 적용**: `GetByID`, `GetByEmail` 등
-5. **리스트 조회 적용**: `List*`, `GetAll*` 등
-6. **테스트 작성**: null 반환 케이스 검증
+## 빈 결과를 테스트에 넣는다
 
-## 결론
-
-API 응답에서 null 배열 문제를 해결하는 핵심:
-
-1. **조회 함수에서 null 체크**: DB에서 조회 후 빈 배열로 초기화
-2. **헬퍼 함수로 추상화**: 중복 코드 방지
-3. **모든 조회 경로에 적용**: 단일 조회, 리스트 조회 모두
-4. **일관성 보장**: 같은 API는 항상 같은 형태의 응답
-
-이 패턴을 적용하면:
-- 프론트엔드 런타임 에러 방지
-- API 응답 예측 가능성 향상
-- 방어적 프로그래밍 불필요
-- 개발자 경험 개선
-
-**null 대신 빈 배열, 작은 변화가 큰 차이를 만든다.**
+단일 조회의 nil 필드, 0건인 목록, 중첩 객체가 없는 경우를 실제 JSON으로 직렬화해 확인한다. 내부 슬라이스 값만 검사하면 태그에 따라 필드가 생략되는 문제를 놓칠 수 있다. 최종 응답에서 약속한 `[]`가 나오는지가 확인 지점이다.

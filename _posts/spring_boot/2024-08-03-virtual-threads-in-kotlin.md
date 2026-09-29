@@ -6,9 +6,11 @@ tags: [spring boot, virtual thread, coroutine, kotlin, java21]
 date: 2024-08-03
 ---
 
-1. Spring Boot 설정:
+가상 스레드와 코루틴은 함께 사용할 수 있다. 다만 설정을 모두 켠다고 애플리케이션 전체가 자동으로 같은 실행 환경을 사용하는 것은 아니다. **Spring의 작업 실행기와 코루틴의 dispatcher를 나눠서 이해해야 한다.**
 
-application.yml 또는 application.properties에서 가상 스레드를 활성화합니다:
+## Java 21과 Spring Boot 3.2 기준 설정
+
+이 글은 Java 21, Spring Boot 3.2의 동작을 기준으로 한다. Spring Boot가 제공하는 가상 스레드 지원은 다음 속성으로 켤 수 있다.
 
 ```yaml
 spring:
@@ -17,123 +19,22 @@ spring:
       enabled: true
 ```
 
-2. 가상 스레드 설정:
+기존 글처럼 Tomcat executor와 비동기 executor를 무조건 다시 만들 필요는 없다. 우선 자동 설정이 적용되는지 확인한다. 직접 선언한 executor가 있으면 자동 설정과 사용 경로가 달라질 수 있다. [Spring Boot 3.2 가상 스레드](https://docs.spring.io/spring-boot/docs/3.2.0/reference/html/features.html#features.spring-application.virtual-threads), [작업 실행과 스케줄링](https://docs.spring.io/spring-boot/docs/3.2.0/reference/html/features.html#features.task-execution-and-scheduling)
 
-```kotlin
-import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration
-import org.springframework.boot.web.embedded.tomcat.TomcatProtocolHandlerCustomizer
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Configuration
-import org.springframework.core.task.AsyncTaskExecutor
-import org.springframework.core.task.support.TaskExecutorAdapter
-import java.util.concurrent.Executors
+## suspend가 스레드를 선택하지는 않는다
 
-@Configuration
-class ThreadConfig {
+`suspend`는 함수가 일시 중단될 수 있음을 나타낸다. 그 함수가 자동으로 Spring의 기본 스레드 풀이나 가상 스레드에서 실행된다는 뜻은 아니다.
 
-    @Bean(TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME)
-    fun asyncTaskExecutor(): AsyncTaskExecutor {
-        return TaskExecutorAdapter(Executors.newVirtualThreadPerTaskExecutor())
-    }
+코루틴은 호출 측 컨텍스트와 dispatcher의 영향을 받는다. 실행 위치를 바꾸려면 `withContext` 등으로 해당 dispatcher를 선택한다. 가상 스레드 executor를 dispatcher로 감쌌다면, 그것을 생성한 쪽이 종료 시 닫아야 한다. `ExecutorCoroutineDispatcher.close()`는 연결된 executor의 종료도 처리한다. [코루틴 컨텍스트와 dispatcher](https://kotlinlang.org/docs/coroutine-context-and-dispatchers.html), [ExecutorService 변환 API](https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/as-coroutine-dispatcher.html)
 
-    @Bean
-    fun protocolHandlerVirtualThreadExecutorCustomizer(): TomcatProtocolHandlerCustomizer<*> {
-        return TomcatProtocolHandlerCustomizer { protocolHandler ->
-            protocolHandler.executor = Executors.newVirtualThreadPerTaskExecutor()
-        }
-    }
-}
-```
+## 수명 관리가 없는 전역 scope를 만들지 않는다
 
-3. 코루틴 디스패처 설정:
+애플리케이션 전체에 `SupervisorJob`을 가진 scope를 만들면 작업의 수명이 요청보다 길어질 수 있다. 그런 작업이 필요한지 먼저 확인하고, 필요하다면 애플리케이션 종료 때 취소하고 완료를 기다리는 주체를 정해야 한다.
 
-가상 스레드를 사용하는 코루틴 디스패처를 생성합니다:
+이전 글의 전역 scope와 수동 executor 예시는 종료 경로를 설명하지 못해 제거했다. 최소 속성 설정에서 시작하고, 특정 블로킹 호출을 분리해야 할 때만 소유권이 분명한 executor와 dispatcher를 추가하는 편이 이해하기 쉽다.
 
-```kotlin
-import kotlinx.coroutines.asCoroutineDispatcher
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Configuration
-import java.util.concurrent.Executors
-import kotlin.coroutines.CoroutineContext
+## CPU 작업이 빨라지는 기능은 아니다
 
-@Configuration
-class CoroutineConfig {
+가상 스레드는 대기가 많은 작업을 다수 유지할 때 도움이 될 수 있다. CPU 계산 자체를 빠르게 만들거나 DB 연결 풀의 용량을 늘려 주지는 않는다. 외부 시스템에 보내는 동시 요청 수도 따로 제한해야 한다. [Java 21 가상 스레드](https://docs.oracle.com/en/java/javase/21/core/virtual-threads.html)
 
-    @Bean
-    fun virtualThreadCoroutineDispatcher(): CoroutineContext {
-        return Executors.newVirtualThreadPerTaskExecutor().asCoroutineDispatcher()
-    }
-}
-```
-
-4. 코루틴 사용:
-
-이제 코루틴에서 가상 스레드 디스패처를 선택적으로 사용할 수 있습니다:
-
-```kotlin
-import kotlinx.coroutines.withContext
-import org.springframework.stereotype.Service
-import org.springframework.beans.factory.annotation.Autowired
-import kotlin.coroutines.CoroutineContext
-
-@Service
-class MyService(@Autowired private val virtualThreadDispatcher: CoroutineContext) {
-
-    suspend fun someCoroutineFunction() {
-        // 기본 코루틴 실행 (스프링의 기본 스레드 풀 사용)
-        // ...
-
-        // 가상 스레드에서 실행하고 싶은 부분
-        withContext(virtualThreadDispatcher) {
-            // 이 블록은 가상 스레드에서 실행됩니다
-        }
-    }
-}
-```
-
-5. 스프링의 @Async 메서드:
-
-@Async 어노테이션을 사용하는 메서드는 자동으로 가상 스레드 풀을 사용하게 됩니다 (위의 ThreadConfig 설정으로 인해).
-
-```kotlin
-import org.springframework.scheduling.annotation.Async
-
-@Service
-class AsyncService {
-
-    @Async
-    fun asyncMethod() {
-        // 이 메서드는 가상 스레드에서 실행됩니다
-    }
-}
-```
-
-6. 코루틴 스코프 설정 (선택적):
-
-애플리케이션 전체에서 사용할 코루틴 스코프를 정의할 수 있습니다:
-
-```kotlin
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Configuration
-import kotlin.coroutines.CoroutineContext
-
-@Configuration
-class CoroutineScopeConfig {
-
-    @Bean
-    fun applicationScope(virtualThreadDispatcher: CoroutineContext): CoroutineScope {
-        return CoroutineScope(virtualThreadDispatcher + SupervisorJob())
-    }
-}
-```
-
-이렇게 설정하면, Spring Boot 애플리케이션에서 가상 스레드와 코루틴을 함께 사용할 수 있습니다. Spring의 기본 비동기 작업은 가상 스레드를 사용하게 되고, 코루틴은 필요에 따라 가상 스레드 디스패처를 선택적으로 사용할 수 있습니다.
-
-주의사항:
-- 모든 작업에 가상 스레드를 사용하는 것이 항상 최선은 아닙니다. 작업의 특성에 따라 적절한 디스패처를 선택해야 합니다.
-- 가상 스레드와 코루틴을 함께 사용할 때는 성능 테스트를 통해 실제 이점을 검증해야 합니다.
-- 일부 라이브러리나 프레임워크는 가상 스레드와 완전히 호환되지 않을 수 있으므로, 철저한 테스트가 필요합니다.
-
-이러한 설정을 통해 가상 스레드의 효율성과 코루틴의 유연성을 모두 활용할 수 있습니다.
+설정 후에는 처리량만 보지 말고 실제 실행 스레드, 요청 지연, DB 연결 대기와 종료 시 남는 작업을 함께 확인한다. [취소와 자원 소유권 사례](/posts/parser-cancellation-resource-ownership/)처럼, 대기를 멈추는 것과 작업이 끝나는 것은 별도로 검증해야 한다.

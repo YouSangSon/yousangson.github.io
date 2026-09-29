@@ -1,348 +1,56 @@
 ---
-title: 분산 락 TTL 최적화 - 1시간에서 30초로, 자동 갱신으로 안정성 확보
-description: SSE 스트리밍 시 분산 락 TTL을 1시간에서 30초로 단축하고, 자동 갱신 메커니즘을 추가하여 클라이언트 새로고침 시 빠른 복구를 가능하게 한 경험
+title: 분산 락 TTL과 자동 갱신 — 만료 뒤의 소유권까지 확인하기
+description: 락 TTL과 작업 timeout을 분리하고, 소유자 확인과 SSE 취소 전파의 한계를 설명한다.
 categories: [architecture, golang]
 tags: [distributed lock, redis, ttl, sse, streaming, golang]
 date: 2025-01-18
 mermaid: true
 ---
 
-## 문제의 발견
-
-AI 채팅 서비스에서 답답한 버그 리포트가 들어왔다.
-
-> "채팅 중에 새로고침했더니 '에이전트 사용중'이라고 나와요. 1시간 동안 못 써요."
-
-로그를 확인해보니 분산 락의 TTL이 **1시간**으로 설정되어 있었다. 클라이언트가 새로고침해도 서버에서는 알 수 없어서 락이 1시간 동안 유지되고 있었다.
-
-## 왜 1시간이었는가?
-
-```mermaid
-flowchart TD
-    A[stream_timeout_seconds: 3600] --> B[분산 락 TTL: 1시간]
-    A --> C[SSE 타임아웃: 1시간]
-
-    D[문제점] --> E[클라이언트 새로고침]
-    E --> F[서버: 연결 해제 감지 불가]
-    F --> G[락 1시간 유지]
-    G --> H[같은 세션 사용 불가]
-```
-
-**초기 설계의 의도:**
-- RAG Flow 응답이 최대 1시간까지 걸릴 수 있음
-- 스트리밍 타임아웃과 락 TTL을 동일하게 설정
-
-**문제점:**
-- RAG Flow SSE 연결은 **서버→클라이언트 단방향**
-- 클라이언트가 연결을 끊어도 서버에서 감지 불가
-- 락이 1시간 동안 유지되어 같은 세션 재사용 불가
-
-## 해결책: TTL 단축 + 자동 갱신
-
-### 핵심 아이디어
-
-{% raw %}
-```
-기존: TTL 1시간 (고정)
-개선: TTL 30초 + 스트리밍 중 10초마다 갱신
-```
-{% endraw %}
-
-정상적인 스트리밍 중에는 락이 계속 갱신되고, 클라이언트가 사라지면 30초 후 자동 해제된다.
-
-### 설정 변경
-
-{% raw %}
-```yaml
-# config.yaml
-connection:
-  sse:
-    stream_timeout_seconds: 3600           # RAG Flow 응답 대기 최대 시간 (1시간)
-    distributed_lock_ttl_seconds: 30       # 분산 락 TTL (30초)
-    lock_extend_interval_seconds: 10       # 분산 락 갱신 주기 (10초)
-```
-{% endraw %}
-
-### 시퀀스 다이어그램
-
-```mermaid
-sequenceDiagram
-    participant Client as 클라이언트
-    participant API as API Gateway
-    participant Redis as Redis
-    participant RAG as RAG Flow
-
-    Client->>API: 질문 요청
-    API->>Redis: 분산 락 획득 (TTL: 30초)
-    API->>RAG: SSE 스트리밍 시작
-
-    loop 스트리밍 중 (10초마다)
-        API->>Redis: ExtendStreamLock (TTL 갱신)
-        Redis-->>API: OK
-    end
-
-    alt 정상 종료
-        RAG-->>API: 스트리밍 완료
-        API->>Redis: 분산 락 해제
-        API-->>Client: 응답 완료
-    else 클라이언트 새로고침
-        Note over Client: 연결 끊김
-        Note over API: ExtendStreamLock 호출 중단
-        Note over Redis: 30초 후 TTL 만료로 자동 해제
-    end
-```
-
-## 구현
-
-### 락 갱신 메서드
-
-{% raw %}
-```go
-func (s *chatService) ExtendStreamLock(ctx context.Context, sessionID string) error {
-    lockKey := fmt.Sprintf("stream_lock:%s", sessionID)
-    ttl := time.Duration(s.config.Connection.SSE.DistributedLockTTL) * time.Second
-
-    // EXPIRE 명령으로 TTL 갱신
-    return s.redis.Expire(ctx, lockKey, ttl).Err()
-}
-```
-{% endraw %}
-
-### 자동 갱신 고루틴
-
-{% raw %}
-```go
-func (s *sseService) startLockExtender(ctx context.Context, sessionID string, stopChan chan struct{}) {
-    interval := time.Duration(s.config.Connection.SSE.LockExtendInterval) * time.Second
-    ticker := time.NewTicker(interval)
-    defer ticker.Stop()
-
-    for {
-        select {
-        case <-stopChan:
-            // 스트리밍 종료
-            return
-        case <-ctx.Done():
-            // 컨텍스트 취소
-            return
-        case <-ticker.C:
-            // 10초마다 TTL 갱신
-            if err := s.lockExtender(ctx, sessionID); err != nil {
-                s.logger.Warnf("failed to extend lock: %v", err)
-            }
-        }
-    }
-}
-```
-{% endraw %}
-
-### SSE 스트리밍에 통합
-
-{% raw %}
-```go
-func (s *sseService) ProcessSSEStream(ctx context.Context, sessionID string, ...) error {
-    // 락 갱신 고루틴 시작
-    stopExtender := make(chan struct{})
-    go s.startLockExtender(ctx, sessionID, stopExtender)
-    defer close(stopExtender)  // 스트리밍 종료 시 갱신 중단
-
-    // SSE 스트리밍 처리
-    for {
-        select {
-        case line := <-lineChan:
-            // 메시지 처리
-        case err := <-errChan:
-            if errors.Is(err, io.EOF) {
-                return nil  // 정상 종료
-            }
-            return err
-        case <-ctx.Done():
-            return ctx.Err()
-        }
-    }
-}
-```
-{% endraw %}
-
-## 멀티 탭 문제
-
-### 추가로 발견된 문제
-
-> "탭1에서 세션A, 탭2에서 세션B를 열면 탭1이 이상해져요."
-
-`ActiveSessionManager`가 **사용자당 하나의 활성 세션만** 인식하고 있었다.
-
-{% raw %}
-```go
-// 문제 코드: 사용자당 하나의 세션만
-func (m *ActiveSessionManager) IsActiveSession(userID, sessionID string) bool {
-    activeSession, exists := m.activeSessions[userID]
-    if !exists {
-        return true
-    }
-    return activeSession == sessionID  // 마지막 세션만 활성
-}
-```
-{% endraw %}
-
-### 해결: 연결별 활성 세션 관리
-
-{% raw %}
-```go
-// 수정 후: 연결(탭)별 활성 세션
-func (m *ActiveSessionManager) IsActiveSession(connectionID, sessionID string) bool {
-    activeSession, exists := m.activeSessions[connectionID]
-    if !exists {
-        return true  // 하위 호환성
-    }
-    return activeSession == sessionID
-}
-```
-{% endraw %}
-
-각 WebSocket 연결(탭)마다 독립적인 활성 세션을 관리한다.
-
-## TTL 값 선택 근거
-
-### 왜 30초인가?
-
-| TTL | 장점 | 단점 |
-|-----|-----|-----|
-| 5초 | 빠른 복구 | 네트워크 지연 시 락 만료 위험 |
-| 30초 | 안전 마진 + 빠른 복구 | - |
-| 60초 | 충분한 안전 마진 | 복구 대기 시간 길어짐 |
-| 1시간 | - | 복구 불가 수준 |
-
-### 왜 10초 갱신인가?
-
-{% raw %}
-```
-TTL: 30초
-갱신 주기: 10초
-안전 마진: 30 - 10 = 20초
-```
-{% endraw %}
-
-- 네트워크 지연이 최대 20초까지 발생해도 락 만료 없음
-- Redis 호출 빈도가 너무 높지 않음 (10초당 1회)
-
-### 권장 설정
-
-| 환경 | TTL | 갱신 주기 | 비고 |
-|-----|-----|----------|-----|
-| 일반 | 30초 | 10초 | 기본 권장값 |
-| 불안정 네트워크 | 60초 | 20초 | 지연 대비 |
-
-## 고려했지만 채택하지 않은 방안
-
-### 1. 클라이언트 연결 상태 감지 (ctx.Done())
-
-{% raw %}
-```go
-// 시도했지만 효과 없음
-select {
-case <-ctx.Done():
-    // 클라이언트 연결 해제 감지?
-}
-```
-{% endraw %}
-
-**문제:** RAG Flow SSE 연결은 서버→클라이언트 단방향이라 클라이언트 상태를 감지할 수 없다.
-
-### 2. 분산 락 TTL 0초 (락 없음)
-
-**문제:**
-- 동일 세션에 동시 요청 시 중복 스트리밍 발생
-- 메시지 순서 보장 불가
-
-### 3. Heartbeat 기반 감지
-
-**문제:**
-- 클라이언트 구현 필요
-- SSE 단방향 특성상 클라이언트→서버 통신 불가
-
-## 결과
-
-### 성능 영향
-
-| 항목 | 영향 |
-|-----|-----|
-| Redis 호출 증가 | 스트리밍 중 10초마다 EXPIRE 1회 (경미) |
-| 메모리 사용 | 고루틴 1개 추가 (무시 가능) |
-| CPU 사용 | Ticker 1개 추가 (무시 가능) |
-
-### 사용자 경험 개선
-
-| 지표 | Before | After |
-|-----|--------|-------|
-| 새로고침 후 대기 시간 | 최대 1시간 | 최대 30초 |
-| 멀티 탭 지원 | 불가 | 가능 |
-
-### 로그 변화
-
-**수정 전:**
-```
-[15:23:45] Client refreshed
-[15:23:45] Lock still held: 59m remaining
-[15:23:45] Error: Agent is busy
-```
-
-**수정 후:**
-```
-[15:23:45] Client refreshed
-[15:23:45] Lock extend stopped
-[15:24:15] Lock expired (30s TTL)
-[15:24:16] New request accepted
-```
-
-## 배운 점
-
-### 1. TTL은 "최악의 상황"을 기준으로 설정하지 마라
-
-{% raw %}
-```
-// 안티패턴: 최악의 경우(1시간 스트리밍)에 맞춤
-lockTTL = streamTimeout  // 1시간
-
-// 올바른 패턴: 짧은 TTL + 자동 갱신
-lockTTL = 30s
-extendInterval = 10s
-```
-{% endraw %}
-
-### 2. 자동 갱신 패턴
-
-{% raw %}
-```go
-// 패턴: 짧은 TTL + 주기적 갱신
-func keepAlive(ctx context.Context, resource string) {
-    ticker := time.NewTicker(extendInterval)
-    defer ticker.Stop()
-
-    for {
-        select {
-        case <-ctx.Done():
-            return  // 컨텍스트 취소 시 갱신 중단 → TTL 만료
-        case <-ticker.C:
-            extend(resource)  // TTL 갱신
-        }
-    }
-}
-```
-{% endraw %}
-
-### 3. 단방향 연결의 한계 인식
-
-SSE는 서버→클라이언트 단방향이다. 클라이언트 상태를 감지하려면:
-- 양방향 통신 (WebSocket) 사용
-- 또는 짧은 TTL + 자동 갱신 (이 방식)
-
-## 결론
-
-분산 락 TTL 최적화의 핵심:
-
-1. **짧은 TTL:** 1시간 → 30초로 단축
-2. **자동 갱신:** 10초마다 TTL 연장
-3. **우아한 종료:** 정상 종료 시 즉시 해제, 비정상 종료 시 TTL 만료
-
-**락은 "보유하는 동안만" 유효해야 한다. 소유자가 사라지면 빠르게 해제되어야 한다.**
+채팅 도중 새로고침한 뒤 같은 세션을 다시 사용할 수 없는 문제가 있었다. 당시 구현은 스트리밍 최대 대기 시간과 분산 락 TTL을 함께 1시간으로 설정했다. 종료 경로에서 락을 정리하지 못하면 긴 TTL이 그대로 복구 대기 시간이 됐다.
+
+짧은 TTL을 주기적으로 갱신하는 방식으로 바꿀 수 있지만, **갱신 주기만 정해서는 안전한 락이 되지 않는다.** 락 소유권과 실제 작업의 수명도 함께 확인해야 한다.
+
+> 2026-09-29 보완: 기존 글의 단순 `EXPIRE` 예시와 “SSE는 연결 해제를 감지할 수 없다”는 설명을 수정했다. Go HTTP 동작은 1.24.5 기준으로 확인했다.
+
+## 작업 제한 시간과 락 유효 기간을 분리한다
+
+| 값 | 의미 |
+| --- | --- |
+| 작업 timeout | 이 요청을 얼마나 오래 수행할 수 있는가 |
+| 락 TTL | 갱신이 끊긴 소유권을 얼마나 오래 인정할 것인가 |
+| 갱신 주기 | 소유권을 유지하기 위해 언제 다시 확인할 것인가 |
+
+당시 설정은 작업 timeout 1시간, 락 TTL 30초, 갱신 주기 10초였다. 이 숫자는 사례의 설정값이지 모든 환경의 권장값은 아니다. 프로세스 정지, 네트워크 지연, Redis 응답 지연이 겹치면 갱신이 만료 시점에 도달하지 못할 수 있다.
+
+TTL 30초에서 10초마다 갱신한다고 “네트워크가 20초 늦어도 안전하다”고 보장할 수는 없다. 마지막으로 성공한 갱신 이후 얼마나 지났는지가 기준이다.
+
+## 갱신과 해제에도 소유자 확인이 필요하다
+
+다음 상황을 생각해 보자.
+
+1. 작업 A가 락을 잡은 뒤 오래 멈춘다.
+2. TTL이 만료되어 작업 B가 같은 키의 락을 잡는다.
+3. A가 다시 실행되어 해당 키에 `EXPIRE`나 `DEL`을 보낸다.
+
+키만 확인하면 A가 B의 락을 연장하거나 삭제할 수 있다. 획득 때 만든 소유자 토큰과 현재 값을 **원자적으로 비교한 뒤** 갱신·해제해야 한다. 비교와 쓰기를 각각의 Redis 호출로 나누면 그 사이에도 소유자가 바뀔 수 있다. [Redis 분산 락의 소유자 확인](https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/)
+
+갱신 실패를 로그만 남기고 넘겨서도 안 된다. 락이 유효하다고 확인할 수 없다면 보호 대상에 대한 쓰기를 계속해도 되는지 판단해야 한다. 이전 작업의 지연된 쓰기까지 막아야 한다면 저장소가 세대 번호나 조건부 갱신을 검사해야 한다. 락 토큰 확인만으로 이미 진행 중인 외부 쓰기를 되돌릴 수는 없다.
+
+## SSE의 단방향 전송과 취소 전파는 다르다
+
+Go 1.24.5의 서버 요청 `Request.Context()`는 클라이언트 연결 종료, HTTP/2 요청 취소, `ServeHTTP` 반환 등의 조건에서 취소된다. SSE가 서버에서 클라이언트로 데이터를 보낸다는 이유만으로 연결 종료를 감지할 수 없는 것은 아니다. [Go 1.24.5 Request.Context](https://github.com/golang/go/blob/go1.24.5/src/net/http/request.go)
+
+다만 브라우저→Gateway 연결과 Gateway→상위 스트리밍 서비스 연결은 서로 다른 연결이다. 요청 컨텍스트를 끊어서 새 작업을 만들거나 프록시가 중간에 있다면 취소가 즉시 전파되지 않을 수 있다. 실제 코드의 컨텍스트 전달과 종료 경로를 확인해야 한다.
+
+짧은 TTL도 갱신 루프가 계속 살아 있으면 만료되지 않는다. **클라이언트 이탈 → 작업 종료 또는 취소 → 갱신 중단**이 연결되어야 복구 시간을 설명할 수 있다. [취소와 실제 작업 종료를 구분한 사례](/posts/parser-cancellation-resource-ownership/)
+
+## 연결별 상태와 세션별 잠금도 나눈다
+
+여러 탭을 지원하려면 현재 화면 상태를 사용자 하나의 키로 덮어쓰지 않아야 한다. 연결별 상태를 보관하되, 동일 세션에 대한 중복 쓰기를 막는 락의 범위는 별도로 유지한다. 연결 정보가 없다는 이유로 권한이 있다고 판단해서도 안 된다.
+
+프론트엔드에서는 오래된 연결이나 요청의 결과가 새 화면을 덮지 못하게 해야 한다. [요청 범위와 세대 번호를 검사하는 방법](/posts/frontend-async-result-scope-and-generation/)이 이 경계를 다룬다.
+
+## 확인할 실패 시나리오
+
+정상 갱신만 시험하면 만료 뒤의 문제가 드러나지 않는다. A의 갱신을 멈춘 뒤 B가 락을 획득하게 하고, 그다음 A의 갱신·해제·쓰기 요청을 재개해 보자. B의 소유권과 데이터가 유지되는지 확인해야 TTL 설계를 검증할 수 있다.

@@ -1,320 +1,86 @@
 ---
-title: CPU 100% 버그 수정 - Go Channel과 Goroutine 누수 디버깅
-description: 채팅 스트리밍 완료 후 CPU가 100%로 유지되는 버그의 원인을 분석하고, closed channel 무한 루프와 goroutine 누수를 해결한 경험
+title: 닫힌 Go 채널이 CPU를 계속 쓰게 만든 이유
+description: Go 1.24.5에서 닫힌 채널과 select의 동작을 재현하고, 고루틴 종료 신호와 실제 종료를 구분한다.
 categories: [debugging, golang]
 tags: [cpu, goroutine, channel, debugging, performance, streaming, golang]
 date: 2024-12-25
 mermaid: true
 ---
 
-## 문제 발견
+채팅 스트리밍이 끝난 뒤에도 CPU 사용률이 높게 유지됐다. 조사한 코드에는 닫힌 채널을 반복해서 읽는 루프가 있었다. 채널의 종료 신호를 빈 문자열 데이터처럼 처리하면서 루프가 쉬지 않고 돌았다.
 
-운영 환경에서 이상한 현상이 보고되었다.
+CPU 사용률만으로 고루틴 누수를 단정할 수는 없다. CPU 프로파일로 바쁜 경로를 찾고, 고루틴 수와 스택을 함께 확인해야 한다. 이 사례에서 중요한 원인은 **닫힌 채널을 읽은 뒤 종료하지 않는 제어 흐름**이었다.
 
-```
-[15:52:56] PID: 83831 | CPU: 94.8% | MEM: 0.1%
-[15:52:57] PID: 83831 | CPU: 101.0% | MEM: 0.1%
-[15:52:58] PID: 83831 | CPU: 99.4% | MEM: 0.1%
-```
+> 2026-09-29 보완: Go **1.24.5** 기준으로 채널과 `select` 설명을 정리했다. 기존의 “다음 ticker 주기까지 종료를 기다린다”는 설명은 잘못되어 바로잡았다.
 
-채팅 스트리밍이 완료된 후에도 CPU가 100%에서 떨어지지 않았다. 메모리는 정상인데 CPU만 폭발한다? Goroutine 문제다.
+## 닫힌 채널에서는 default가 탈출구가 되지 않는다
 
-## 원인 분석
+채널을 닫아도 버퍼에 남은 값은 먼저 읽을 수 있다. 버퍼까지 비면 수신은 대기하지 않고 원소 타입의 zero value와 `ok=false`를 반환한다.
 
-### 1. Closed Channel 무한 루프 (주범)
+`select`의 `default`는 다른 통신 case가 즉시 진행할 수 없을 때만 선택된다. 닫히고 비워진 채널의 수신은 항상 진행 가능하므로 `default`로 빠지지 않는다. [Go 언어 명세: 수신 연산](https://go.dev/ref/spec#Receive_operator), [select](https://go.dev/ref/spec#Select_statements)
 
-SSE 스트림 처리 코드에서 문제를 발견했다.
+다음 예제는 무한 루프를 만들지 않고 그 동작을 확인한다.
 
-{% raw %}
 ```go
-// 문제 코드
-drainLineChanOnEOF:
-    for {
-        select {
-        case line := <-lineChan:  // ← ok 체크 없음!
-            if line != "" {
-                // 처리 로직
-            }
-            // line이 빈 문자열이어도 루프 계속
-        default:
-            break drainLineChanOnEOF
-        }
-    }
-```
-{% endraw %}
+package main
 
-**문제점:**
-- `lineChan`이 닫히면 `<-lineChan`은 **zero value(빈 문자열)**를 즉시 반환
-- `ok` 체크가 없어서 채널이 닫혔는지 모름
-- `default` case가 선택되기 전까지 **빈 문자열로 무한 루프**
-- **이것이 CPU 100%의 직접적인 원인**
+import "fmt"
 
-### Go Channel의 동작 원리
+func main() {
+    closed := make(chan string)
+    close(closed)
 
-```mermaid
-flowchart TD
-    A["line := <-lineChan"] --> B{채널 상태?}
-    B -->|열려있음 + 데이터 있음| C["데이터 반환"]
-    B -->|열려있음 + 데이터 없음| D["블로킹 대기"]
-    B -->|닫힘| E["zero value 즉시 반환"]
-
-    E --> F{"ok 체크 있음?"}
-    F -->|"line, ok := <-lineChan"| G["ok = false<br/>루프 탈출 가능"]
-    F -->|"line := <-lineChan"| H["무한 루프!<br/>CPU 100%"]
-```
-
-### 2. Ticker Goroutine 지연 종료
-
-Heartbeat goroutine도 문제였다.
-
-{% raw %}
-```go
-// 문제 코드
-go func() {
-    ticker := time.NewTicker(5 * time.Minute)
-    for {
-        select {
-        case <-ticker.C:      // ← 먼저 선택되면
-            doWork()          // ← 작업 수행
-        case <-stopChan:      // ← stopChan이 닫혀도 다음 cycle까지 대기
-            return
-        }
-    }
-}()
-```
-{% endraw %}
-
-**문제점:**
-- Go의 `select`는 여러 case가 ready일 때 **무작위 선택**
-- `ticker.C`가 선택되면 `doWork()` 완료 후 다시 `select`로 돌아감
-- `stopChan`이 닫혀도 다음 ticker cycle(최대 5분)까지 goroutine 살아있음
-- 여러 채팅 세션 누적 시 goroutine이 쌓임 → CPU 폭발
-
-### 3. 불필요한 정리 작업 호출
-
-{% raw %}
-```go
-// 문제 코드
-sm.signalCompletion(sessionID)
-go func() {
-    // signalCompletion 직후인데 또 PrepareForNewStream?
-    // 내부에서 WaitForStreamCompletion (1초 대기) 호출
-    if err := sm.PrepareForNewStream(sessionID); err != nil {
-        // ...
-    }
-}()
-```
-{% endraw %}
-
-## 해결책
-
-### 1. Channel Closed 체크 추가
-
-{% raw %}
-```go
-// 수정 후
-drainLineChanOnEOF:
-    for {
-        line, ok := <-lineChan  // ← ok 체크 추가!
-        if !ok {
-            // 채널이 닫혔고 모든 메시지를 읽었음
-            break drainLineChanOnEOF
-        }
-        if line != "" {
-            // 처리 로직
-        }
-    }
-```
-{% endraw %}
-
-**핵심 개선:**
-- `select`와 `default` case 제거
-- `ok` 체크로 채널이 닫혔을 때만 종료
-- 모든 메시지 보장 (메시지 손실 방지)
-
-### 2. Ticker Goroutine 즉시 종료
-
-{% raw %}
-```go
-// 수정 후
-go func() {
-    ticker := time.NewTicker(heartbeatInterval)
-    defer ticker.Stop()
-    for {
-        select {
-        case <-stopChan:  // 우선 확인
-            return
-        case <-ticker.C:
-            // 작업 수행 전 재확인
-            select {
-            case <-stopChan:
-                return
-            default:
-            }
-            doWork()
-        }
-    }
-}()
-```
-{% endraw %}
-
-**핵심 개선:**
-- `stopChan`을 작업 수행 전에 **재확인**
-- Ticker cycle(5분)까지 대기하지 않고 즉시 종료
-- Goroutine 누적 방지
-
-### 3. 불필요한 호출 제거
-
-{% raw %}
-```go
-// 수정 후
-sm.signalCompletion(sessionID)
-// PrepareForNewStream은 다음 요청이 올 때 자동으로 호출되므로
-// 여기서 호출 불필요
-```
-{% endraw %}
-
-## 수정 흐름
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant ChatSSE as chat_sse.go
-    participant Heartbeat as Heartbeat Goroutine
-    participant SSE as sse_session_manager.go
-    participant LineChan as lineChan
-
-    Client->>ChatSSE: 채팅 요청
-    ChatSSE->>Heartbeat: Start (5min ticker)
-    ChatSSE->>SSE: SendToRAGFlow()
-    SSE->>LineChan: Read stream
-
-    Note over SSE,LineChan: 스트리밍 중...
-
-    SSE->>LineChan: EOF 발생
-    LineChan-->>SSE: Channel closed
-
-    Note over SSE: ✅ 수정: ok 체크 추가
-    SSE->>SSE: if !ok { return }
-
-    SSE->>ChatSSE: Stream completed
-    ChatSSE->>ChatSSE: close(stopChan)
-
-    Note over Heartbeat: ✅ 수정: 즉시 종료
-    Heartbeat->>Heartbeat: select { case <-stopChan: return }
-
-    Note over ChatSSE: CPU: 5-10% (정상)
-```
-
-## 결과
-
-### CPU 사용량 변화
-
-**수정 전:**
-```
-[15:52:56] CPU: 94.8%
-[15:52:57] CPU: 101.0%
-[15:52:58] CPU: 99.4%
-```
-
-**수정 후:**
-```
-[15:56:54] CPU: 1.0%
-[15:56:55] CPU: 0.5%
-[15:56:56] CPU: 1.0%
-```
-
-### 성능 영향
-
-| 변경사항 | 성능 영향 | 중요도 |
-|---------|----------|-------|
-| Channel closed 체크 | 무한 루프 제거 → CPU 100% → 5% | 🔥 최우선 |
-| Ticker goroutine 최적화 | 즉시 종료 → Goroutine 누적 방지 | ⚠️ 중요 |
-| PrepareForNewStream 제거 | 1초 대기 제거 | ⚠️ 중요 |
-
-## 배운 점
-
-### 1. Channel 읽기의 두 가지 방식
-
-{% raw %}
-```go
-// 방식 1: ok 체크 없음 (위험!)
-line := <-lineChan
-// 채널이 닫히면 zero value가 계속 반환 → 무한 루프 가능
-
-// 방식 2: ok 체크 있음 (안전)
-line, ok := <-lineChan
-if !ok {
-    // 채널이 닫혔음을 확실히 알 수 있음
-}
-```
-{% endraw %}
-
-**규칙:** 닫힐 수 있는 채널에서 읽을 때는 **항상 `ok` 체크**
-
-### 2. select와 default의 함정
-
-{% raw %}
-```go
-select {
-case line := <-lineChan:
-    // 처리
-default:
-    break  // 채널이 비어있으면 즉시 탈출
-}
-```
-{% endraw %}
-
-`default`가 있으면 채널이 **비어있을 때** 즉시 탈출하지만, 채널이 **닫혔을 때**는 zero value가 계속 반환된다. 다른 개념이다!
-
-### 3. Goroutine 종료 패턴
-
-{% raw %}
-```go
-// 패턴: 작업 전 stop 신호 재확인
-for {
     select {
-    case <-stopChan:
-        return  // 우선 확인
-    case <-ticker.C:
-        select {
-        case <-stopChan:
-            return  // 재확인
-        default:
+    case value, ok := <-closed:
+        if value != "" || ok {
+            panic("unexpected closed-channel result")
         }
-        doWork()  // 작업 수행
+        fmt.Println("closed receive selected")
+    default:
+        panic("default must not be selected")
     }
+
+    lines := make(chan string, 2)
+    lines <- "first"
+    lines <- "second"
+    close(lines)
+
+    count := 0
+    for range lines {
+        count++
+    }
+    if count != 2 {
+        panic("buffered messages were lost")
+    }
+    fmt.Println("drained:", count)
 }
 ```
-{% endraw %}
 
-### 4. CPU 100% 디버깅 체크리스트
+출력은 다음과 같다.
 
-1. **Goroutine 누수 확인**: `runtime.NumGoroutine()` 모니터링
-2. **Channel 상태 확인**: closed channel에서 읽을 때 `ok` 체크 여부
-3. **무한 루프 확인**: `for` 루프 내 탈출 조건 검토
-4. **Ticker/Timer 정리**: `defer ticker.Stop()` 확인
-5. **Stop 신호 전파**: `stopChan` 닫힘 후 즉시 종료 여부
-
-## 결론
-
-CPU 100% 버그의 원인은 의외로 단순했다:
-
-1. **Closed channel에서 `ok` 체크 누락** → 무한 루프
-2. **Ticker goroutine의 지연 종료** → Goroutine 누적
-3. **불필요한 정리 작업** → 추가 CPU 소모
-
-가장 중요한 교훈: **Go channel에서 읽을 때는 항상 `ok`를 체크하라.**
-
-{% raw %}
-```go
-// 이렇게 하지 마세요
-line := <-lineChan
-
-// 이렇게 하세요
-line, ok := <-lineChan
-if !ok {
-    return
-}
+```text
+closed receive selected
+drained: 2
 ```
-{% endraw %}
+
+## 종료 방식을 채널의 계약에 맞춘다
+
+생산자가 마지막 값을 보낸 뒤 채널을 닫는 계약이라면 `for range ch`로 남은 값을 읽고 종료할 수 있다. 취소나 여러 채널을 함께 다뤄야 한다면 `select`에서 `value, ok := <-ch`를 사용해 종료를 처리한다.
+
+기존의 non-blocking drain을 단순한 수신 루프로 바꾸면, 채널이 아직 열려 있을 때 기다리게 된다. 따라서 `ok` 검사만 추가하는 문제와 “생산자가 닫을 때까지 기다릴 것인가”는 구분해야 한다. 생산자 종료 보장 없이 바꾸면 CPU 회전 대신 대기 누수가 생길 수 있다.
+
+종료 신호만 받는 `<-done`에는 값과 `ok`가 필요하지 않을 수 있다. “모든 수신에는 항상 ok”가 아니라 데이터와 종료를 구분해야 하는 곳에서 적절한 패턴을 선택한다.
+
+## select의 작성 순서는 우선순위가 아니다
+
+여러 case가 준비되어 있으면 `select`는 그중 하나를 선택한다. 종료 case를 맨 위에 쓴다고 우선 실행하지 않는다.
+
+`stopChan`이 닫혀 있고 고루틴이 `select`에서 대기 중이라면 다음 ticker 시각까지 기다릴 이유가 없다. 이미 진행할 수 있는 종료 case가 있기 때문이다. 다만 `doWork()` 안에서 오래 실행 중이라면 함수가 반환하거나 스스로 취소를 처리할 때까지 루프로 돌아오지 못한다.
+
+작업 직전에 종료 신호를 다시 검사하면 불필요한 시작을 줄일 수 있다. 그러나 검사 직후 취소될 수 있으므로 즉시 종료를 보장하는 방법은 아니다. 실행 중 작업에도 컨텍스트를 전달하고, 호출자가 실제 종료를 기다릴 수 있어야 한다.
+
+## 다시 확인할 경계
+
+[파서의 취소와 자원 소유권](/posts/parser-cancellation-resource-ownership/)에서는 취소 신호를 보낸 뒤에도 실제 작업이 자원을 사용했다. 언어가 달라도 확인할 질문은 같다. **종료를 요청했는가, 실제로 끝났는가, 누가 그것을 확인하는가?**
+
+수정 검증에서는 채널 종료 후 CPU 프로파일에서 해당 루프가 사라지는지 확인하고, 반복 요청 뒤 고루틴 수가 안정되는지 별도로 본다. 이 예제의 출력은 채널 의미를 확인하는 증거이며 운영 환경의 성능 측정값은 아니다.

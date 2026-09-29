@@ -1,402 +1,49 @@
 ---
 title: Vector DB 문서 삭제 전략 - 분산 시스템 데이터 정합성 유지
-description: 파일 삭제 시 Milvus Vector DB의 청크와 임베딩을 함께 정리하여 AI 답변 오염을 방지하고, 재시도 메커니즘으로 데이터 정합성을 보장하는 구현 경험
+description: 메타데이터 삭제, 검색 차단, Vector DB 정리와 지연된 writer 제어를 나누어 삭제 완료 조건을 정한다.
 categories: [architecture, golang]
 tags: [vector db, milvus, data consistency, retry, distributed systems, golang]
 date: 2025-01-12
 mermaid: true
 ---
 
-## 문제의 발견
-
-AI 채팅 서비스 운영 중 이상한 버그 리포트가 들어왔다.
-
-> "분명히 삭제한 파일인데, AI가 그 파일 내용을 계속 참조해요."
-
-로그를 분석해보니 **고아 데이터(Orphaned Data)** 문제였다. MongoDB에서 파일을 삭제해도 Milvus Vector DB에는 해당 문서의 청크와 임베딩이 그대로 남아있었다.
-
-## 왜 문제인가?
-
-### 데이터 불일치로 인한 AI 답변 오염
-
-```mermaid
-flowchart TD
-    A[사용자: 파일 삭제] --> B[MongoDB에서 파일 삭제]
-    B --> C{Vector DB도 삭제?}
-    C -->|기존| D[삭제 안 함]
-    D --> E[AI 검색 시 삭제된 파일 내용 참조]
-    E --> F[부정확한 AI 답변]
-
-    C -->|개선| G[Vector DB 청크/임베딩 삭제]
-    G --> H[AI 검색 시 삭제된 내용 제외]
-    H --> I[정확한 AI 답변]
-```
-
-### 영향받는 삭제 작업
-
-| 삭제 대상 | 연관 Vector DB 데이터 |
-|----------|---------------------|
-| 파일 삭제 | 해당 파일의 청크/임베딩 |
-| 에이전트 삭제 | 에이전트의 모든 파일 청크/임베딩 |
-| 세션 삭제 | 세션의 모든 파일 청크/임베딩 |
-| 사용자 삭제 | 사용자 소유 모든 파일 청크/임베딩 |
-
-## 해결책: Vector DB Service 연동
-
-### API 설계
-
-{% raw %}
-```go
-// Vector DB 삭제 요청/응답 구조
-type VectorDBDeleteRequest struct {
-    FileIDs []string `json:"file_ids"`
-}
-
-type VectorDBDeleteResponse struct {
-    Status string `json:"status"`
-    Result struct {
-        DeleteCount int `json:"delete_count"`
-        Cost        int `json:"cost"`
-    } `json:"result"`
-}
-```
-{% endraw %}
-
-### 클라이언트 구현
-
-{% raw %}
-```go
-type VectorDBClient struct {
-    baseURL    string
-    httpClient *http.Client
-    logger     logger.Logger
-    retryCount int           // 재시도 횟수 (기본: 3)
-    retryDelay time.Duration // 재시도 간격 (기본: 1초)
-}
-
-func (c *VectorDBClient) DeleteDocuments(ctx context.Context, fileIDs []string) error {
-    if len(fileIDs) == 0 {
-        return nil // 삭제할 파일이 없으면 성공으로 처리
-    }
-
-    // 재시도 로직 포함
-    return c.deleteDocumentsWithRetry(ctx, fileIDs)
-}
-```
-{% endraw %}
-
-## 핵심 문제: 분산 트랜잭션
-
-MongoDB 트랜잭션은 MongoDB 내부만 보장한다. Vector DB는 별도 서비스이므로 분산 트랜잭션이 불가능하다.
-
-```mermaid
-sequenceDiagram
-    participant App as Application
-    participant Mongo as MongoDB
-    participant VDB as Vector DB
-
-    Note over App,VDB: MongoDB 트랜잭션
-    App->>Mongo: 파일 삭제
-    App->>Mongo: 참조 정리
-    Note over App,Mongo: 트랜잭션 커밋
-
-    Note over App,VDB: 트랜잭션 외부
-    App->>VDB: 청크/임베딩 삭제
-    VDB-->>App: 실패!
-
-    Note over App,VDB: MongoDB는 삭제됨<br/>Vector DB는 남음
-```
-
-### 해결: 비동기 처리 + 재시도 메커니즘
-
-{% raw %}
-```go
-func (s *fileService) DeleteFile(ctx context.Context, fileID string) error {
-    // Phase 1: MongoDB 트랜잭션
-    _, err = session.WithTransaction(ctx, func(mongoCtx mongo.SessionContext) (any, error) {
-        // 1. 에이전트/세션 컬렉션에서 파일 참조 제거
-        if err := s.removeFileReferences(mongoCtx, fileID); err != nil {
-            return nil, err
-        }
-
-        // 2. 파일 삭제
-        if _, err := s.collection.DeleteOne(mongoCtx, bson.M{"_id": fileID}); err != nil {
-            return nil, err
-        }
-
-        return nil, nil
-    })
-
-    if err != nil {
-        return err  // MongoDB 실패 시 전체 실패
-    }
-
-    // Phase 2: Vector DB 삭제 (트랜잭션 외부, best effort)
-    if s.vectorDBClient != nil {
-        if err := s.vectorDBClient.DeleteDocuments(ctx, []string{fileID}); err != nil {
-            s.logger.Warnf("failed to delete from vector db: %v", err)
-            // 실패 기록 저장 (자동 동기화를 위해)
-            s.RecordVectorDBDeletionFailure(ctx, fileID, err)
-        }
-    }
-
-    return nil  // 파일 삭제는 성공
-}
-```
-{% endraw %}
-
-## 재시도 메커니즘
-
-### 즉시 재시도 (3회)
-
-{% raw %}
-```go
-func (c *VectorDBClient) deleteDocumentsWithRetry(ctx context.Context, fileIDs []string) error {
-    var lastErr error
-    for i := 0; i < c.retryCount; i++ {
-        err := c.deleteDocuments(ctx, fileIDs)
-        if err == nil {
-            c.logger.Infof("Successfully deleted documents on attempt %d", i+1)
-            return nil
-        }
-
-        lastErr = err
-        c.logger.Warnf("Vector db deletion attempt %d failed: %v", i+1, err)
-
-        // 마지막 시도가 아니면 점진적 백오프
-        if i < c.retryCount-1 {
-            waitTime := time.Duration(i+1) * c.retryDelay
-            time.Sleep(waitTime)
-        }
-    }
-
-    return fmt.Errorf("failed after %d retries: %w", c.retryCount, lastErr)
-}
-```
-{% endraw %}
-
-### 비동기 재시도 (실패 기록 기반)
-
-```mermaid
-flowchart TD
-    A[Vector DB 삭제 실패] --> B[실패 기록 저장<br/>MongoDB]
-    B --> C[주기적 동기화 작업<br/>10분마다 실행]
-    C --> D{파일이<br/>삭제되었는가?}
-    D -->|Yes| E[Vector DB 삭제 재시도]
-    D -->|No| F[기록 유지<br/>다음 주기 대기]
-    E --> G{재시도 성공?}
-    G -->|Yes| H[기록 삭제]
-    G -->|No| I{재시도 횟수<br/>10회 초과?}
-    I -->|No| J[재시도 횟수 증가<br/>다음 주기 대기]
-    I -->|Yes| K[기록 유지<br/>최대 재시도 초과]
-```
-
-{% raw %}
-```go
-// 실패 기록 저장
-func (s *fileService) RecordVectorDBDeletionFailure(ctx context.Context, fileID string, err error) {
-    failure := models.VectorDBDeletionFailure{
-        FileID:     fileID,
-        Error:      err.Error(),
-        FailedAt:   time.Now(),
-        Status:     "pending",
-        RetryCount: 0,
-    }
-    s.failureCollection.InsertOne(ctx, failure)
-}
-
-// 주기적 동기화 (10분마다)
-func (s *fileService) SyncVectorDBDeletions(ctx context.Context) {
-    failures, _ := s.failureCollection.Find(ctx, bson.M{
-        "status":      "pending",
-        "retry_count": bson.M{"$lt": 10},
-    })
-
-    for failures.Next(ctx) {
-        var failure models.VectorDBDeletionFailure
-        failures.Decode(&failure)
-
-        // 파일이 실제로 삭제되었는지 확인
-        exists, _ := s.fileExists(ctx, failure.FileID)
-        if exists {
-            continue  // 파일이 아직 있으면 스킵
-        }
-
-        // Vector DB 삭제 재시도
-        if err := s.vectorDBClient.DeleteDocuments(ctx, []string{failure.FileID}); err != nil {
-            // 재시도 횟수 증가
-            s.failureCollection.UpdateOne(ctx,
-                bson.M{"_id": failure.ID},
-                bson.M{"$inc": bson.M{"retry_count": 1}},
-            )
-        } else {
-            // 성공 시 기록 삭제
-            s.failureCollection.DeleteOne(ctx, bson.M{"_id": failure.ID})
-        }
-    }
-}
-```
-{% endraw %}
-
-## 리소스별 삭제 처리
-
-### 에이전트 삭제
-
-{% raw %}
-```go
-func (s *agentService) DeleteAgent(ctx context.Context, agentID string) error {
-    // 1. 에이전트 소유 파일 ID 수집
-    agent, _ := s.GetAgent(ctx, agentID)
-    fileIDs := agent.FileIds
-
-    // 2. 관련 세션들의 파일 ID도 수집
-    sessions, _ := s.sessionService.GetSessionsByAgent(ctx, agentID)
-    for _, session := range sessions {
-        fileIDs = append(fileIDs, session.FileIds...)
-    }
-
-    // 3. 에이전트 삭제 (MongoDB 트랜잭션)
-    if err := s.deleteAgentDocuments(ctx, agentID); err != nil {
-        return err
-    }
-
-    // 4. Vector DB에서 관련 문서 삭제
-    if len(fileIDs) > 0 && s.vectorDBClient != nil {
-        if err := s.vectorDBClient.DeleteDocuments(ctx, fileIDs); err != nil {
-            s.logger.Warnf("failed to delete from vector db: %v", err)
-            s.RecordVectorDBDeletionFailures(ctx, fileIDs, err)
-        }
-    }
-
-    return nil
-}
-```
-{% endraw %}
-
-### 사용자 삭제
-
-{% raw %}
-```go
-func (s *userService) DeleteUser(ctx context.Context, userID string) error {
-    // 1. 사용자 소유 파일 ID 수집 (에이전트/세션 포함)
-    fileIDs := s.collectUserFileIDs(ctx, userID)
-
-    // 2. 사용자 삭제 (트랜잭션)
-    if err := s.deleteUserDocuments(ctx, userID); err != nil {
-        return err
-    }
-
-    // 3. Vector DB에서 관련 문서 삭제
-    if len(fileIDs) > 0 && s.vectorDBClient != nil {
-        if err := s.vectorDBClient.DeleteDocuments(ctx, fileIDs); err != nil {
-            s.logger.Warnf("failed to delete from vector db: %v", err)
-            s.RecordVectorDBDeletionFailures(ctx, fileIDs, err)
-        }
-    }
-
-    return nil
-}
-```
-{% endraw %}
-
-## 설정
-
-{% raw %}
-```yaml
-# config.yaml
-services:
-  vector_db:
-    url: https://vectordb.example.com
-    timeout: 60s
-    sync_interval: 10m      # 동기화 주기
-    max_retries: 10         # 최대 재시도 횟수
-    cleanup_older_days: 30  # 오래된 실패 기록 정리 기간
-```
-{% endraw %}
-
-## 왜 이렇게 설계했는가?
-
-### 비동기 처리를 선택한 이유
-
-| 방식 | 장점 | 단점 |
-|-----|-----|-----|
-| 동기식 (Vector DB 실패 시 롤백) | 완전한 일관성 | Vector DB 장애 시 파일 삭제 불가 |
-| 비동기식 (best effort) | 높은 가용성 | 일시적 불일치 가능 |
-
-**결론:** 사용자 경험을 위해 비동기 처리 선택. Vector DB 장애로 파일 삭제가 막히면 안 된다.
-
-### 재시도 횟수가 10회인 이유
-
-- 너무 적으면 일시적 장애 극복 불가
-- 너무 많으면 영구적 문제를 반복 시도
-- 10분마다 10회 = 약 100분간 복구 시도
-
-## 결과
-
-### 데이터 정합성 개선
-
-| 지표 | Before | After |
-|-----|--------|-------|
-| 고아 Vector DB 문서 | 수천 건 | 0건 |
-| AI 답변 오염 | 발생 | 없음 |
-| 데이터 정합성 | 불일치 | 일치 |
-
-### 로그 변화
-
-**수정 전:**
-```
-[15:23:45] file deleted: file123
-(Vector DB에 청크 남아있음)
-```
-
-**수정 후:**
-```
-[15:23:45] file deleted: file123
-[15:23:45] vector db deletion successful: delete_count=15
-```
-
-## 배운 점
-
-### 1. 분산 시스템에서 완전한 트랜잭션은 불가능
-
-MongoDB 트랜잭션은 MongoDB 내부만 보장한다. 외부 시스템(Vector DB, Redis, MinIO)은 별도 처리가 필요하다.
-
-### 2. Best Effort + 재시도 패턴
-
-{% raw %}
-```go
-// 핵심 패턴: 핵심 로직은 트랜잭션, 부가 로직은 best effort
-if err := coreTransaction(); err != nil {
-    return err  // 핵심 실패 시 전체 실패
-}
-
-if err := externalSystemCall(); err != nil {
-    log.Warn(err)
-    recordFailureForRetry(err)
-    // 부가 실패는 로그만, 재시도로 해결
-}
-```
-{% endraw %}
-
-### 3. 점진적 백오프로 부하 분산
-
-{% raw %}
-```go
-// 1초, 2초, 3초 점진적 대기
-waitTime := time.Duration(attempt+1) * baseDelay
-time.Sleep(waitTime)
-```
-{% endraw %}
-
-일시적 장애 시 급격한 재시도로 인한 추가 부하를 방지한다.
-
-## 결론
-
-Vector DB 문서 삭제 전략의 핵심:
-
-1. **비동기 처리**: 외부 시스템 장애로 핵심 기능이 막히면 안 됨
-2. **즉시 재시도**: 일시적 네트워크 오류 대응 (3회, 점진적 백오프)
-3. **비동기 재시도**: 영구적 장애 대응 (10분마다, 최대 10회)
-4. **실패 기록**: 데이터 정합성 추적 및 관리
-
-**삭제된 파일의 유령이 AI 답변을 오염시키지 않도록, 모든 흔적을 완전히 정리하라.**
+파일을 삭제했는데도 AI 답변이 그 내용을 참조하는 문제가 있었다. MongoDB의 파일 메타데이터는 없어졌지만 Vector DB의 청크와 임베딩은 남아 있었다. 파일 삭제 API의 성공과 검색 대상에서의 제거가 다른 시점에 일어난 것이다.
+
+## 메타데이터 삭제와 검색 차단을 구분한다
+
+| 상태 | 확인할 내용 |
+| --- | --- |
+| 삭제 요청 접수 | 삭제할 파일·버전과 요청 권한을 식별했는가 |
+| 검색 차단 | 새 검색에서 해당 자료를 사용하지 않게 했는가 |
+| 벡터 삭제 | 대상 버전의 청크·임베딩이 조회되지 않는가 |
+| 객체·참조 정리 | 다른 사용처를 훼손하지 않고 정리했는가 |
+
+삭제 API의 2xx 응답이나 삭제 작업의 등록만으로 이 단계가 모두 끝났다고 판단하지 않는다. 실제 검색 경로와 저장소의 관측 결과가 필요하다.
+
+## MongoDB 커밋이 외부 삭제를 롤백하지는 않는다
+
+MongoDB 트랜잭션은 그 트랜잭션에 참여한 MongoDB 변경을 원자적으로 처리한다. 외부 Vector DB나 MinIO 요청이 자동으로 함께 롤백되는 것은 아니다. 따라서 “동기 호출이면 완전한 일관성”이라는 기존 비교는 잘못됐다. [MongoDB 트랜잭션 범위](https://www.mongodb.com/docs/manual/core/transactions/)
+
+동기 호출과 비동기 작업 중 무엇을 골라도 중간 실패를 처리해야 한다. 메타데이터를 지운 뒤 정리 기록을 남기기 전에 종료될 수 있다면, 외부 삭제를 다시 시도할 근거가 사라진다. 삭제 의도와 필요한 식별자를 내구성 있게 남기고 다음 작업으로 이어 갈 수 있어야 한다.
+
+이 글의 예전 코드에는 실패 기록 저장과 조회 오류를 무시하는 부분이 있었다. 그 코드만으로 복구를 보장할 수 없어 제거하고, 검증해야 할 경계를 정리했다.
+
+## 늦게 끝난 writer가 데이터를 다시 만들 수 있다
+
+한 번 벡터가 없어졌다는 사실만으로 삭제가 안정적으로 끝났다고 볼 수 없는 경우도 있다. 삭제 전에 시작된 파싱·임베딩 작업이 나중에 저장하면 자료가 다시 생길 수 있기 때문이다.
+
+[파이프라인의 불변 버전과 처리 시도](/posts/immutable-versions-through-rag-pipeline/)를 기준으로 writer가 여전히 유효한지 확인해야 한다. 삭제할 파일 ID만 전달하는 것보다 어느 버전·처리 시도의 데이터를 지우는지 명확해야 새 자료를 잘못 지우지 않는다.
+
+에이전트나 세션의 참조를 제거할 때도 실제 파일 소유권과 다른 참조가 남았는지 확인한다. “참조를 지운다”와 “공유된 원본을 물리적으로 지운다”는 다른 작업이다.
+
+## 재시도의 종료 조건을 정한다
+
+일시적인 연결 오류는 재시도할 수 있다. 입력이 잘못됐거나 삭제할 버전이 불명확하면 반복 호출보다 분류와 조치가 먼저다. 최대 횟수에 도달했을 때도 완료로 바꾸지 말고 남은 작업과 실패 이유를 유지해야 한다.
+
+[삭제 실행 책임을 옮긴 사례](/posts/moving-cleanup-execution-ownership/)에서는 어떤 서비스가 정리를 수행하는지와 다른 서비스가 무엇을 확인해야 하는지를 다룬다. [문서 재시도 설계](/posts/document-processing-retry-mechanism/)는 복구 기록을 잃지 않는 순서를 설명한다.
+
+## 삭제 완료를 검증하는 방법
+
+실제 검색에서 삭제 자료가 나오지 않는지 확인하고, 진행 중이던 writer를 재개해도 같은 버전이 다시 저장되지 않는지 확인한다. 외부 삭제 직후 프로세스를 종료했다가 재시작했을 때 정리 상태를 이어 갈 수 있는지도 본다.
+
+기존 글의 “고아 문서 0건”은 조회 조건과 시점이 제시되지 않아 일반적인 완료 보장으로 사용할 수 없다. 이 글에서는 새 수치 대신 검색 차단, writer 제어, 저장소 확인이라는 완료 조건을 남겼다.
