@@ -110,6 +110,13 @@ async function checkUrlsAndReferences() {
   for (const htmlFile of htmlFiles)
     roots.set(htmlFile, parse(await fs.readFile(path.join(distDir, htmlFile), 'utf8')))
 
+  for (const post of builtPosts) {
+    const content = roots.get(post)?.querySelector('#post-content')
+    check(Boolean(content), `${post}: missing article body`)
+    check(!content?.childNodes.some(node => node.nodeType === 3 && node.textContent.trim()), `${post}: prose escaped its paragraph; check Markdown extensions`)
+    check(!content?.querySelectorAll('p').some(node => node.childNodes.length === 0), `${post}: empty paragraph in article body`)
+  }
+
   // Coverage is based on the published corpus, not a fixed number of articles.
   const publishedSlugs = new Set(builtPosts.map(file => file.split('/')[1]))
   const assignedSlugs = topics.flatMap(topic => topic.posts)

@@ -14,7 +14,7 @@
     "lint:fix": "eslint . --fix",
     "apply-lqip": "tsx scripts/apply-lqip.ts",
     "prepare-posts": "tsx scripts/prepare-posts.ts",
-    "verify": "tsx scripts/verify-site.ts"
+    "verify": "node scripts/verify-markdown.mjs && tsx scripts/verify-site.ts"
   },
   "dependencies": {
     "@astrojs/mdx": "^5.0.3",

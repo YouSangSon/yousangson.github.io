@@ -111,7 +111,9 @@ html.dark .heti pre span {
 
 /* Inline Code */
 .heti :where(code) {
-  --at-apply: 'uno-round-border bg-secondary/5 px-0.4em py-0.15em text-0.85em tracking-normal cjk:break-all';
+  --at-apply: 'uno-round-border bg-secondary/5 px-0.4em py-0.15em text-0.85em tracking-normal';
+  word-break: normal;
+  overflow-wrap: anywhere;
   counter-reset: line;
 }
 .heti code span.line {

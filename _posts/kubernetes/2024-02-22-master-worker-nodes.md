@@ -43,7 +43,7 @@ kubectl -n demo describe pod api-a
 kubectl get nodes
 ```
 
-가령 이벤트가 CPU 부족을 가리킨다면 request와 노드의 할당 가능 자원을 비교하고, 다른 제약도 함께 확인한다. 이미지 태그를 바꿔도 노드 후보가 생기지는 않는다. 반대로 이벤트가 볼륨 바인딩을 가리키면 PVC와 StorageClass의 `volumeBindingMode`까지 살펴야 한다. `WaitForFirstConsumer`는 Pod의 배치 제약을 고려하려고 바인딩을 늦출 수 있으므로, PVC `Pending` 한 단어만으로 저장소 장애를 단정할 수도 없다. [StorageClass의 볼륨 바인딩 방식](https://kubernetes.io/docs/concepts/storage/storage-classes/#volume-binding-mode)
+가령 이벤트가 CPU 부족을 가리킨다면 request와 노드의 할당 가능 자원을 비교하고, 다른 제약도 함께 확인한다. 이미지 태그를 바꿔도 노드 후보가 생기지는 않는다. 반대로 이벤트가 볼륨 바인딩을 가리키면 영구 스토리지 요청인 PVC와 스토리지 종류를 정의하는 StorageClass의 `volumeBindingMode`까지 살펴야 한다. `WaitForFirstConsumer`는 Pod의 배치 제약을 고려하려고 바인딩을 늦출 수 있으므로, PVC `Pending` 한 단어만으로 저장소 장애를 단정할 수도 없다. [StorageClass의 볼륨 바인딩 방식](https://kubernetes.io/docs/concepts/storage/storage-classes/#volume-binding-mode)
 
 ## `api-b`: 노드는 정해졌지만 컨테이너가 시작하지 못했다
 

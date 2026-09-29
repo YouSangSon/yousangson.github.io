@@ -6,7 +6,7 @@ tags: [kubernetes, gitlab ci, rbac, serviceaccount, networkpolicy, pvc]
 date: 2026-09-03
 ---
 
-CI 배포 job이 실패했다. 첫 실행은 Kubernetes API 연결 시간 초과, 연결을 고친 다음 실행은 `NetworkPolicy` 생성 `Forbidden`, 권한을 바로잡은 다음에는 PVC가 `Pending`이다. job 이름은 하나여도 세 실패는 같은 원인으로 이어지지 않는다. **각 시도의 마지막으로 확인된 경계**를 기록해야 다음 수정을 고를 수 있다.
+CI 배포 job이 실패했다. 첫 실행은 Kubernetes API 연결 시간 초과, 연결을 고친 다음 실행은 `NetworkPolicy` 생성 `Forbidden`, 권한을 바로잡은 다음에는 영구 스토리지 요청인 PVC가 `Pending`이다. job 이름은 하나여도 세 실패는 같은 원인으로 이어지지 않는다. **각 시도의 마지막으로 확인된 경계**를 기록해야 다음 수정을 고를 수 있다.
 
 아래 `demo` 네임스페이스, `deployer` ServiceAccount와 오류 문구는 교육용 가상 사례다. 실제 클러스터 출력·고객 설정·배포 기록이 아니다. 명령은 읽기 전용 진단 예시이며 이 글을 위해 클러스터에서 실행하지 않았다.
 

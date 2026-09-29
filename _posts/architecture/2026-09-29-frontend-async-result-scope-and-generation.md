@@ -74,7 +74,7 @@ try {
 
 ## IME와 debounce 사이의 빈 시간도 선택 변경이다
 
-IME로 한글을 입력할 때 조합 중간의 문자열로 검색하지 않기로 했다면, 조합 중 `input`은 조회를 예약하지 않는다. `compositionend`는 조합이 완료되거나 취소될 때 발생한다. 조합이 끝난 뒤 확정된 입력창 값으로 다음 예약을 결정하고, 한 이벤트의 `data`만으로 검색어를 추측하지 않는다. `InputEvent.isComposing`도 조합 중인지 알려 준다. [MDN compositionend](https://developer.mozilla.org/en-US/docs/Web/API/Element/compositionend_event), [MDN isComposing](https://developer.mozilla.org/en-US/docs/Web/API/InputEvent/isComposing)
+한글처럼 여러 키 입력을 한 글자로 조합하는 입력기(IME)를 사용할 때 조합 중간의 문자열로 검색하지 않기로 했다면, 조합 중 `input`은 조회를 예약하지 않는다. `compositionend`는 조합이 완료되거나 취소될 때 발생한다. 조합이 끝난 뒤 확정된 입력창 값으로 다음 예약을 결정하고, 한 이벤트의 `data`만으로 검색어를 추측하지 않는다. `InputEvent.isComposing`도 조합 중인지 알려 준다. [MDN compositionend](https://developer.mozilla.org/en-US/docs/Web/API/Element/compositionend_event), [MDN isComposing](https://developer.mozilla.org/en-US/docs/Web/API/InputEvent/isComposing)
 
 여기서 흔한 틈은 타이머다. `rep`를 위한 debounce가 예약된 뒤 입력창을 비웠다면, 옛 타이머가 나중에 실행돼 지운 검색어를 다시 조회해서는 안 된다. 새 입력을 받는 **즉시** 이전 타이머를 취소하고 현재 요청 세대를 무효화해야 한다. 폴더 변경처럼 입력창 밖에서 선택을 교체할 때도 그 타이머를 취소한다. 그렇지 않으면 옛 폴더의 예약 작업이 새 세대를 얻어 현재 결과를 덮을 수 있다. 새 조회를 시작할지는 조합 종료와 debounce 이후에 판단한다.
 

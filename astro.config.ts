@@ -16,6 +16,7 @@ import { rehypeHeadingAnchor } from './src/plugins/rehype-heading-anchor.mjs'
 import { rehypeImageProcessor } from './src/plugins/rehype-image-processor.mjs'
 import { remarkContainerDirectives } from './src/plugins/remark-container-directives.mjs'
 import { remarkLeafDirectives } from './src/plugins/remark-leaf-directives.mjs'
+import { remarkLiteralTextDirectives } from './src/plugins/remark-literal-text-directives.mjs'
 import { remarkReadingTime } from './src/plugins/remark-reading-time.mjs'
 
 const { url: site } = themeConfig.site
@@ -57,6 +58,7 @@ export default defineConfig({
   markdown: {
     remarkPlugins: [
       remarkDirective,
+      remarkLiteralTextDirectives,
       remarkMath,
       remarkContainerDirectives,
       remarkLeafDirectives,
