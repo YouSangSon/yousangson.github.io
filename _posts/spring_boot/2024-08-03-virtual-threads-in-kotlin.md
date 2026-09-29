@@ -8,7 +8,7 @@ date: 2024-08-03
 
 `spring.threads.virtual.enabled=true`를 설정하고 Kotlin `suspend` 함수를 호출했다. 그러면 그 함수의 모든 코드가 가상 스레드에서 실행될까? **설정이 바꾸는 Spring 실행 경로와 코루틴이 선택하는 dispatcher는 서로 다른 경계**다. 실제 호출이 어느 경계를 지나는지 확인하지 않으면 설정만으로 실행 스레드를 예측할 수 없다.
 
-이 글은 **Java 21과 Spring Boot 3.2**의 문서를 기준으로 한다. 뒤에 나온 JDK나 Spring 버전의 구현 변화를 2024년 설정에 소급하지 않는다. 아래 Kotlin 예제는 로컬 JVM에서 executor와 dispatcher의 연결만 확인한다. Spring Boot 애플리케이션의 요청 처리나 성능을 측정한 결과는 아니다.
+기준은 **Java 21과 Spring Boot 3.2**다. 아래 Kotlin 예제에서는 로컬 JVM의 executor와 dispatcher 연결을 확인한다. Spring Boot 애플리케이션의 요청 처리 성능을 측정하는 예제는 아니다.
 
 ## 가상 스레드는 어떤 대기를 가볍게 하는가
 

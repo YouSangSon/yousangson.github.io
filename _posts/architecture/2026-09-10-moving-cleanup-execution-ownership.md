@@ -8,7 +8,7 @@ date: 2026-09-10
 
 테스트가 초안 한 건을 지웠다고 보고했다. 이 결과만으로 정리 함수의 이동이 끝났다고 할 수 있을까? 예전 패키지가 여전히 삭제 여부를 판단해도 같은 테스트는 통과한다. 파일의 위치와 **결정을 내리는 위치**는 따로 확인해야 한다.
 
-Go 1.24.5로 실행한 가상 메모리 저장소는 두 패키지로 나뉜다. `oldapi`는 호출자를 위한 옛 진입점을, `draft`는 보호 조건과 실제 변경을 맡는다. 회사의 파일 정리 코드나 저장소 규칙을 옮긴 예제가 아니다. 재현하려면 [go.mod](/assets/examples/2026-09-29/engineering-depth/cleanup/go.mod), [`draft/store.go`](/assets/examples/2026-09-29/engineering-depth/cleanup/draft/store.go), [`oldapi/cleanup.go`](/assets/examples/2026-09-29/engineering-depth/cleanup/oldapi/cleanup.go), [`oldapi/cleanup_test.go`](/assets/examples/2026-09-29/engineering-depth/cleanup/oldapi/cleanup_test.go)를 같은 상대 경로에 놓고 `go.mod`가 있는 디렉터리에서 `GOTOOLCHAIN=go1.24.5 go test -v ./...`를 실행한다.
+Go 1.24.5로 실행한 가상 메모리 저장소는 두 패키지로 나뉜다. `oldapi`는 호출자를 위한 옛 진입점을, `draft`는 보호 조건과 실제 변경을 맡는다. 재현하려면 [go.mod](/assets/examples/2026-09-29/engineering-depth/cleanup/go.mod), [`draft/store.go`](/assets/examples/2026-09-29/engineering-depth/cleanup/draft/store.go), [`oldapi/cleanup.go`](/assets/examples/2026-09-29/engineering-depth/cleanup/oldapi/cleanup.go), [`oldapi/cleanup_test.go`](/assets/examples/2026-09-29/engineering-depth/cleanup/oldapi/cleanup_test.go)를 같은 상대 경로에 놓고 `go.mod`가 있는 디렉터리에서 `GOTOOLCHAIN=go1.24.5 go test -v ./...`를 실행한다.
 
 ```text
 호출자 → oldapi.Remove(store, id) → draft.Store.Remove(id)

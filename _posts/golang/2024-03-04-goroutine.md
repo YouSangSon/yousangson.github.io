@@ -7,7 +7,7 @@ description: Go 1.24.5의 고루틴과 GOMAXPROCS 기본값, 컨테이너 CPU �
 
 `GOMAXPROCS=1`이면 고루틴도 하나만 만들 수 있을까? 아니다. 두 고루틴을 만들어 채널 앞까지 진행시키고, 둘 다 나중에 완료할 수 있다. 이 값은 **동시에 Go 코드를 실행하는 능력**을 제한한다. 대기 중인 작업 수, OS 스레드 총수, 요청 수의 상한이 아니다.
 
-이 글은 Go **1.24.5**를 기준으로 한다. 이후 버전의 컨테이너 기본값 변경을 과거 버전에 소급하지 않는다. 아래 예제는 동작을 확인하는 실험이지 성능이나 컨테이너 CPU 사용량의 측정값이 아니다.
+기준 버전은 Go **1.24.5**다. 아래 예제에서는 고루틴의 동작을 확인하며, 성능이나 컨테이너 CPU 사용량은 측정하지 않는다.
 
 ## `go f()` 뒤에는 무엇이 생기는가
 
@@ -68,7 +68,7 @@ workers completed: 2
 
 Go 1.24.5에서 별도 설정이 없을 때 `GOMAXPROCS` 기본값은 시작 시점의 `runtime.NumCPU()`다. 이는 프로세스에 사용할 수 있는 논리 CPU 수이며, 컨테이너의 cgroup CPU bandwidth quota와 같은 수치라고 가정하면 안 된다. Go 1.25 릴리스 노트는 그 전 버전의 기본값을 이처럼 설명하고, **1.25부터** Linux cgroup CPU bandwidth 제한을 기본값 계산에 반영한다고 명시한다. [Go 1.25 릴리스 노트: Container-aware GOMAXPROCS](https://go.dev/doc/go1.25#runtime)
 
-예를 들어 CPU affinity로 보이는 논리 CPU가 8개인데 cgroup quota가 2 CPU에 해당하는 환경을 생각해 보자. 별도 설정이 없는 **Go 1.24.5 기본 동작**이라면 `GOMAXPROCS`는 보이는 CPU 수를 기준으로 8이 될 수 있다. 이는 설명용 가정이며 이 글이 특정 컨테이너에서 8 또는 2를 측정했다는 뜻이 아니다. CPU quota를 초과해 실행하려는 Go 작업은 운영체제의 throttling을 만날 수 있으나, 실제 지연 영향은 작업과 제한 조건을 측정해야 한다. Go 1.25의 새 기본 동작을 적용한 시스템이라면 런타임 버전, 수동 설정 여부, 실제 quota를 다시 확인해야 한다. [Go 1.25 릴리스 노트](https://go.dev/doc/go1.25#runtime)
+예를 들어 CPU affinity로 보이는 논리 CPU가 8개인데 cgroup quota가 2 CPU에 해당하는 환경을 생각해 보자. 별도 설정이 없는 **Go 1.24.5 기본 동작**이라면 `GOMAXPROCS`는 보이는 CPU 수를 기준으로 8이 될 수 있다. 앞의 8과 2는 특정 컨테이너에서 측정한 값이 아닌 설명용 설정이다. CPU quota를 초과해 실행하려는 Go 작업은 운영체제의 throttling을 만날 수 있으나, 실제 지연 영향은 작업과 제한 조건을 측정해야 한다. Go 1.25의 새 기본 동작을 적용한 시스템이라면 런타임 버전, 수동 설정 여부, 실제 quota를 다시 확인해야 한다. [Go 1.25 릴리스 노트](https://go.dev/doc/go1.25#runtime)
 
 `GOMAXPROCS` 환경 변수나 `runtime.GOMAXPROCS()` 호출은 운영자가 정한 값을 바꾼다. 시작 코드에 `runtime.GOMAXPROCS(runtime.NumCPU())`를 습관적으로 넣으면 운영 환경에서 설정한 한도를 덮어쓸 수 있다. Go 1.25의 동적 기본값 갱신도 수동 설정 시 비활성화된다. 버전에 맞춰 **실행 중인 값, 실제 CPU affinity와 quota, throttling, 지연 시간**을 따로 확인하고 조정해야 한다. [`runtime.GOMAXPROCS` API](https://pkg.go.dev/runtime#GOMAXPROCS), [Go 1.25 릴리스 노트](https://go.dev/doc/go1.25#runtime)
 

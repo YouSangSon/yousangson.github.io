@@ -170,7 +170,7 @@ async function checkUrlsAndReferences() {
     for (const node of root.querySelectorAll('a[href], area[href]'))
       checkReference(node.getAttribute('href') ?? '', htmlFile, sourceUrl, true)
 
-    for (const node of root.querySelectorAll('img[src], source[src], video[poster], script[src], link[href]')) {
+    for (const node of root.querySelectorAll('img[src], source[src], video[poster], script[src], link[href], iframe[src]')) {
       const attribute = node.hasAttribute('poster') ? 'poster' : node.hasAttribute('src') ? 'src' : 'href'
       checkReference(node.getAttribute(attribute) ?? '', htmlFile, sourceUrl, false)
     }
