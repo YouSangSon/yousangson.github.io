@@ -1,0 +1,31 @@
+plugins {
+    id 'java'
+    id 'com.google.cloud.tools.jib' version '3.5.3'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.apache.commons:commons-lang3:3.14.0'
+}
+
+jib {
+    from {
+        image = 'eclipse-temurin:21-jre@sha256:d15c341db792d6bacbbe66d173f4ce278d4a7edf07336ab487e6a707c93c9fe4'
+        platforms {
+            platform {
+                architecture = 'arm64'
+                os = 'linux'
+            }
+        }
+    }
+    to {
+        image = 'example.invalid/jib-layer-demo:local'
+    }
+    container {
+        mainClass = 'example.Main'
+        creationTime = 'EPOCH'
+    }
+}

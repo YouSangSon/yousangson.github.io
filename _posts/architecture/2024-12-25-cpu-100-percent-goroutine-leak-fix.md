@@ -7,19 +7,27 @@ date: 2024-12-25
 mermaid: true
 ---
 
-채팅 스트리밍이 끝난 뒤에도 CPU 사용률이 높게 유지됐다. 조사한 코드에는 닫힌 채널을 반복해서 읽는 루프가 있었다. 채널의 종료 신호를 빈 문자열 데이터처럼 처리하면서 루프가 쉬지 않고 돌았다.
+스트리밍 루프가 채널이 닫힌 뒤에도 끝나지 않는다고 하자. 새 데이터는 없는데 수신 case가 계속 선택되고, `default`는 한 번도 실행되지 않는다. 이 상황을 '채널이 비었으니 수신은 기다릴 것'이라고 예상하면 원인을 놓친다. **닫히고 비워진 채널의 수신은 즉시 완료되기 때문이다.**
 
-CPU 사용률만으로 고루틴 누수를 단정할 수는 없다. CPU 프로파일로 바쁜 경로를 찾고, 고루틴 수와 스택을 함께 확인해야 한다. 이 사례에서 중요한 원인은 **닫힌 채널을 읽은 뒤 종료하지 않는 제어 흐름**이었다.
+아래는 **Go 1.24.5의 채널 규칙을 설명하는 교육용 예제**다. 특정 서비스의 로그나 CPU 측정값을 재현한 것이 아니다. 채널의 규칙, 실제 CPU 소비, 고루틴이 끝나지 않는 원인은 서로 다른 증거로 확인해야 한다.
 
-> 2026-09-29 보완: Go **1.24.5** 기준으로 채널과 `select` 설명을 정리했다. 기존의 “다음 ticker 주기까지 종료를 기다린다”는 설명은 잘못되어 바로잡았다.
+## 닫힌 채널은 비활성 채널이 아니다
 
-## 닫힌 채널에서는 default가 탈출구가 되지 않는다
+채널을 닫아도 버퍼에 남은 값은 먼저 수신된다. 그 값까지 읽고 나면 수신은 즉시 원소 타입의 zero value를 돌려준다. `value, ok := <-ch`에서 `ok`는 `false`다. 문자열 채널이라면 그 값은 `""`이므로, 빈 문자열도 유효한 데이터일 수 있는 프로토콜에서는 `value`만으로 종료를 판별할 수 없다. [Go 언어 명세: Receive operator](https://go.dev/ref/spec#Receive_operator)
 
-채널을 닫아도 버퍼에 남은 값은 먼저 읽을 수 있다. 버퍼까지 비면 수신은 대기하지 않고 원소 타입의 zero value와 `ok=false`를 반환한다.
+`select`의 `default`는 통신 case 중 즉시 진행 가능한 것이 없을 때 선택된다. 닫히고 비워진 채널의 수신은 **항상 준비된 case**이므로 `default`는 탈출구가 아니다. 루프에서 `ok`를 무시하면 매 반복마다 zero value를 받고 다시 수신한다. 반복 사이에 대기하는 연산이 없다면 계속 CPU 실행 기회를 소비할 수 있다. [Go 언어 명세: Select statements](https://go.dev/ref/spec#Select_statements)
 
-`select`의 `default`는 다른 통신 case가 즉시 진행할 수 없을 때만 선택된다. 닫히고 비워진 채널의 수신은 항상 진행 가능하므로 `default`로 빠지지 않는다. [Go 언어 명세: 수신 연산](https://go.dev/ref/spec#Receive_operator), [select](https://go.dev/ref/spec#Select_statements)
+```text
+닫힌 채널 수신 → value="", ok=false → 즉시 다음 반복
+                    ↑                    |
+                    └────────────────────┘
+```
 
-다음 예제는 무한 루프를 만들지 않고 그 동작을 확인한다.
+이 그림은 수신 경로의 제어 흐름이지 실제 CPU 사용률 그래프가 아니다. 다른 case에 대기가 있더라도 닫힌 채널 case가 계속 준비되어 있다면 루프가 쉴 필요가 없다. 정확한 CPU 비용은 작업 본문과 실행 환경에 따라 달라진다.
+
+## 무한 루프 대신 세 번만 실행해 본다
+
+다음 파일은 문제가 되는 수신을 세 번만 반복한다. 그 뒤에는 버퍼에 마지막 값이 남은 채널을 읽고, 종료를 확인하면 channel case를 `nil`로 비활성화한 다음 stop case로 빠져나간다. `nil` 채널의 수신은 진행할 수 없으므로, 다른 case를 선택할 수 있다. [Go 언어 명세: nil 및 닫힌 채널 수신](https://go.dev/ref/spec#Receive_operator)
 
 ```go
 package main
@@ -27,60 +35,62 @@ package main
 import "fmt"
 
 func main() {
-    closed := make(chan string)
-    close(closed)
+	closed := make(chan string)
+	close(closed)
+	for i := 0; i < 3; i++ {
+		select {
+		case value, ok := <-closed:
+			fmt.Printf("bad receive: value=%q ok=%t\n", value, ok)
+		default:
+			panic("closed receive should be ready")
+		}
+	}
 
-    select {
-    case value, ok := <-closed:
-        if value != "" || ok {
-            panic("unexpected closed-channel result")
-        }
-        fmt.Println("closed receive selected")
-    default:
-        panic("default must not be selected")
-    }
-
-    lines := make(chan string, 2)
-    lines <- "first"
-    lines <- "second"
-    close(lines)
-
-    count := 0
-    for range lines {
-        count++
-    }
-    if count != 2 {
-        panic("buffered messages were lost")
-    }
-    fmt.Println("drained:", count)
+	lines := make(chan string, 1)
+	lines <- "last"
+	close(lines)
+	stop := make(chan struct{})
+	for {
+		select {
+		case value, ok := <-lines:
+			if !ok {
+				lines = nil
+				close(stop)
+				continue
+			}
+			fmt.Println("line:", value)
+		case <-stop:
+			fmt.Println("stopped")
+			return
+		}
+	}
 }
 ```
 
-출력은 다음과 같다.
-
 ```text
-closed receive selected
-drained: 2
+bad receive: value="" ok=false
+bad receive: value="" ok=false
+bad receive: value="" ok=false
+line: last
+stopped
 ```
 
-## 종료 방식을 채널의 계약에 맞춘다
+첫 세 줄은 `default`에 빠지지 않고 **같은 닫힌 채널에서 즉시 세 번 수신**했다는 증거다. 세 번이라는 상한을 없애고 `ok`도 무시하면 종료 조건 없이 반복할 수 있다. 마지막 두 줄은 닫힌 buffered 채널에서도 기존 값 `"last"`를 먼저 받는다는 점과, `ok=false`를 처리해 선택지를 바꾼 뒤 종료한다는 점을 보여 준다. 이 예제는 실제 CPU 사용률을 측정하지 않는다.
 
-생산자가 마지막 값을 보낸 뒤 채널을 닫는 계약이라면 `for range ch`로 남은 값을 읽고 종료할 수 있다. 취소나 여러 채널을 함께 다뤄야 한다면 `select`에서 `value, ok := <-ch`를 사용해 종료를 처리한다.
+`lines = nil`만 쓰고 다른 준비된 case나 종료 조건이 없다면 `select`는 오히려 영원히 대기할 수 있다. 여기서는 교육용으로 `stop`을 닫아 다음 반복의 종료 case가 반드시 준비되게 했다. 제품 코드에서는 채널을 닫는 쪽과 종료 신호를 보내는 쪽의 책임을 정해야 한다. 수신자가 임의로 생산자의 채널을 닫으면 보내는 쪽의 panic을 만들 수 있다. [Go 언어 명세: Send statements](https://go.dev/ref/spec#Send_statements)
 
-기존의 non-blocking drain을 단순한 수신 루프로 바꾸면, 채널이 아직 열려 있을 때 기다리게 된다. 따라서 `ok` 검사만 추가하는 문제와 “생산자가 닫을 때까지 기다릴 것인가”는 구분해야 한다. 생산자 종료 보장 없이 바꾸면 CPU 회전 대신 대기 누수가 생길 수 있다.
+## 한 채널이면 range, 여러 사건이면 select
 
-종료 신호만 받는 `<-done`에는 값과 `ok`가 필요하지 않을 수 있다. “모든 수신에는 항상 ok”가 아니라 데이터와 종료를 구분해야 하는 곳에서 적절한 패턴을 선택한다.
+생산자가 마지막 값을 보내고 반드시 닫는 계약이라면 `for value := range ch`가 가장 단순하다. 버퍼를 비운 뒤 자연스럽게 루프가 끝난다. 그러나 생산자가 닫지 않을 수 있다면 `range`는 계속 기다린다. 닫힘을 기다려야 하는지, 별도 취소 신호로도 나와야 하는지가 먼저 정해져야 한다. [Go 언어 명세: for range와 채널](https://go.dev/ref/spec#For_statements)
 
-## select의 작성 순서는 우선순위가 아니다
+여러 입력이나 취소 신호를 함께 기다릴 때는 `select`가 필요하다. 데이터 채널의 `ok=false`를 확인하고 그 case를 제거하거나 함수에서 반환한다. 종료 신호 전용 `<-done`처럼 값은 버리고 닫힘 자체만 의미가 있다면 매번 `ok` 변수를 만들 이유는 없다. 중요한 것은 **닫힘을 데이터로 취급하는지, 제어 신호로 취급하는지**를 구분하는 일이다.
 
-여러 case가 준비되어 있으면 `select`는 그중 하나를 선택한다. 종료 case를 맨 위에 쓴다고 우선 실행하지 않는다.
+`select`의 case 순서는 우선순위가 아니다. 둘 이상의 통신이 즉시 진행 가능하면 명세상 준비된 case 하나가 균등한 의사 난수 선택으로 결정된다. 따라서 `stop` case를 맨 위에 놓아도 이미 준비된 데이터 case보다 반드시 먼저 실행되지는 않는다. 취소를 받은 뒤 새 작업을 시작하지 않아야 한다면 작업 시작 직전에 취소 상태를 다시 확인하고, 작업 자체에도 취소를 전달해야 한다. 재확인 직후 취소가 도착할 수 있으므로, 이미 시작한 작업의 종료는 별도로 기다려야 한다. [Go 언어 명세: Select statements](https://go.dev/ref/spec#Select_statements), [Go context 문서](https://pkg.go.dev/context#Context)
 
-`stopChan`이 닫혀 있고 고루틴이 `select`에서 대기 중이라면 다음 ticker 시각까지 기다릴 이유가 없다. 이미 진행할 수 있는 종료 case가 있기 때문이다. 다만 `doWork()` 안에서 오래 실행 중이라면 함수가 반환하거나 스스로 취소를 처리할 때까지 루프로 돌아오지 못한다.
+## CPU 회전과 고루틴 누수는 같은 관측이 아니다
 
-작업 직전에 종료 신호를 다시 검사하면 불필요한 시작을 줄일 수 있다. 그러나 검사 직후 취소될 수 있으므로 즉시 종료를 보장하는 방법은 아니다. 실행 중 작업에도 컨텍스트를 전달하고, 호출자가 실제 종료를 기다릴 수 있어야 한다.
+이 글의 닫힌 채널 루프는 **진행 가능한 수신을 반복**하는 경우다. 반대로 열려 있지만 아무도 보내지 않는 채널에서 수신을 기다리는 고루틴은 CPU를 거의 쓰지 않아도 끝나지 않을 수 있다. 둘 다 '종료하지 않은 고루틴'이지만 문제의 자원과 진단 증거가 다르다. 고루틴 수가 늘었다는 사실만으로 CPU 회전을 증명할 수 없고, CPU 사용률이 높다는 사실만으로 고루틴 수의 증가를 증명할 수도 없다.
 
-## 다시 확인할 경계
+실제 애플리케이션에서는 CPU 프로파일로 실행 시간을 쓰는 함수와 줄을 찾고, 같은 시점의 고루틴 스택으로 반복 실행인지 차단 대기인지 확인해야 한다. 반복 요청 뒤 고루틴 수가 누적되는지도 별도로 본다. [Go diagnostics](https://go.dev/doc/diagnostics), [runtime/pprof](https://pkg.go.dev/runtime/pprof)
 
-[파서의 취소와 자원 소유권](/posts/parser-cancellation-resource-ownership/)에서는 취소 신호를 보낸 뒤에도 실제 작업이 자원을 사용했다. 언어가 달라도 확인할 질문은 같다. **종료를 요청했는가, 실제로 끝났는가, 누가 그것을 확인하는가?**
-
-수정 검증에서는 채널 종료 후 CPU 프로파일에서 해당 루프가 사라지는지 확인하고, 반복 요청 뒤 고루틴 수가 안정되는지 별도로 본다. 이 예제의 출력은 채널 의미를 확인하는 증거이며 운영 환경의 성능 측정값은 아니다.
+마지막으로 종료 신호를 보냈다는 사실과 실제 종료를 합치지 말자. `stop`이 닫혀도 고루틴이 긴 `doWork()` 안에 있으면 `select`로 돌아올 때까지 그 신호를 처리하지 못한다. 호출자가 자원을 정리해야 한다면 종료 신호뿐 아니라 고루틴의 완료를 기다릴 경로가 필요하다. [파서의 취소와 자원 소유권](/posts/parser-cancellation-resource-ownership/)도 같은 수명 경계를 다룬다. 다음에 닫힌 채널을 만난다면 `value`보다 먼저 `ok`와 **다음 반복에서 어떤 case가 준비되는지**를 살펴보자.
