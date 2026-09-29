@@ -12,7 +12,9 @@ CI 배포 job이 실패했다. 첫 실행은 Kubernetes API 연결 시간 초과
 
 ## 첫 실행: API에 닿았다는 증거가 없다
 
-가상 로그의 첫 줄은 `dial tcp <api-address>:443: i/o timeout`이다. 이 메시지는 클라이언트가 제때 연결을 완료하지 못했다는 관찰이다. Kubernetes가 `NetworkPolicy`를 거절했거나 ServiceAccount 권한이 부족하다는 증거는 아니다. runner에서 사용한 API 주소, 이름 해석, 라우팅, 방화벽, TLS 연결까지 **어느 지점의 응답을 받았는지** 좁혀야 한다. 실제 runner가 클러스터 밖에 있다면 Pod를 대상으로 하는 Kubernetes `NetworkPolicy`가 runner의 API 연결을 직접 통제한다고 가정해서도 안 된다. NetworkPolicy는 Pod 트래픽을 대상으로 하고 지원하는 네트워크 플러그인이 적용한다. [NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+가상 로그의 첫 줄은 `dial tcp <api-address>:443: i/o timeout`이다. 이 메시지는 클라이언트가 제때 연결을 완료하지 못했다는 관찰이다. Kubernetes가 `NetworkPolicy`를 거절했거나 ServiceAccount 권한이 부족하다는 증거는 아니다. runner에서 사용한 API 주소, 이름 해석, 라우팅, 방화벽, TLS 연결까지 **어느 지점의 응답을 받았는지** 좁혀야 한다.
+
+실제 runner가 클러스터 밖에 있다면 Pod를 대상으로 하는 Kubernetes `NetworkPolicy`가 runner의 API 연결을 직접 통제한다고 가정해서도 안 된다. NetworkPolicy는 Pod 트래픽을 대상으로 하고 지원하는 네트워크 플러그인이 적용한다. [NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 
 가상 사례에서는 runner의 kubeconfig가 이미 폐기된 API 주소를 가리켰다고 하자. 주소를 현재 진입점으로 고친 뒤 Kubernetes 형식의 응답을 받았다면, 이번 변경으로 **연결 경계는 넘었다**고 검증할 수 있다. 일반적으로는 `timeout` 한 줄만으로 주소 오류나 DNS 문제를 단정하지 않는다. CI의 kubeconfig가 가리키는 클러스터와 주소를 비밀값을 노출하지 않는 방식으로 확인하고, runner 환경에서 DNS·TCP·TLS의 결과를 각각 기록한다. 주소가 해석돼도 다음 네트워크 구간에서 막힐 수 있다.
 

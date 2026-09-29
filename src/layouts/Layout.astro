@@ -54,7 +54,7 @@ const MarginBottom = isPost && themeConfig.comment.enabled
       </div>
       <main
         id="main-content"
-        class:list={['page-main', isHome && 'page-main-home', MarginBottom]}
+        class:list={['page-main', isHome && 'page-main-home', isPost && 'page-main-post', MarginBottom]}
         data-pagefind-body={isPost ? '' : undefined}
       >
         <slot />

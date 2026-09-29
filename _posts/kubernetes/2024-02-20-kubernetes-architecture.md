@@ -33,7 +33,9 @@ Deployment 컨트롤러는 저장된 객체를 관찰하고 새 ReplicaSet을 �
 사용자 → DNS/외부 진입점 → Ingress 컨트롤러 → Service → 준비된 백엔드 Pod
 ```
 
-Ingress 규칙은 요청의 host와 path를 어느 Service로 보낼지 선언한다. Service는 안정적인 접근 지점을 제공하고, 연결할 백엔드 정보는 EndpointSlice로 추적된다. Pod가 Ready가 아니면 일반적인 selector 기반 Service의 정상 백엔드로 취급되지 않는다. 따라서 `kubectl get deployment`가 `1/3`인 동안에도 선택된 백엔드가 하나라면 요청이 갈 수 있지만, 그 하나의 장애를 견딜 여유는 없다. 반대로 `3/3`이라도 외부 DNS가 틀리거나 Ingress 컨트롤러가 규칙을 처리하지 않는다면 외부 요청은 실패한다. Kubernetes API 서버는 이런 일반 애플리케이션 요청을 매번 중계하지 않는다. [Service](https://kubernetes.io/docs/concepts/services-networking/service/), [EndpointSlice](https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/), [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
+Ingress 규칙은 요청의 host와 path를 어느 Service로 보낼지 선언한다. Service는 안정적인 접근 지점을 제공하고, 연결할 백엔드 정보는 EndpointSlice로 추적된다. Pod가 Ready가 아니면 일반적인 selector 기반 Service의 정상 백엔드로 취급되지 않는다.
+
+따라서 `kubectl get deployment`가 `1/3`인 동안에도 선택된 백엔드가 하나라면 요청이 갈 수 있지만, 그 하나의 장애를 견딜 여유는 없다. 반대로 `3/3`이라도 외부 DNS가 틀리거나 Ingress 컨트롤러가 규칙을 처리하지 않는다면 외부 요청은 실패한다. Kubernetes API 서버는 이런 일반 애플리케이션 요청을 매번 중계하지 않는다. [Service](https://kubernetes.io/docs/concepts/services-networking/service/), [EndpointSlice](https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/), [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
 
 여기서 `kubectl get`이 잘 된다는 사실은 제어 경로의 일부가 살아 있다는 증거다. 앱 접속 성공의 증거로 바꿔 쓰면 안 된다. 반대로 API 서버가 잠시 조회에 응답하지 않는다는 사실만으로, 이미 설정된 Service 경로의 기존 트래픽이 반드시 끊겼다고 단정할 수도 없다. 실제 영향은 클러스터의 네트워크 구현과 당시 백엔드 상태를 확인해야 한다.
 

@@ -57,6 +57,23 @@
   word-break: keep-all;
 }
 
+/* Full-width posts share the homepage grid; spacing separates each thought. */
+.page-main-post .heti {
+  font-size: clamp(1rem, 0.5vw + 0.9rem, 1.125rem);
+  line-height: 1.85;
+}
+.page-main-post #post-content > p {
+  margin-bottom: 1.35em;
+}
+/* Keep compact comparisons centered without stretching gaps between columns. */
+.page-main-post #post-content table {
+  min-width: 0;
+  margin-inline: auto;
+}
+.page-main-post #post-content > h2 {
+  margin-top: 2.5em;
+}
+
 /* Links */
 .heti :where(a:not(.no-heti):not(.no-heti *)) {
   --at-apply: 'font-semibold tracking-normal underline underline-0.075em decoration-secondary/80 underline-offset-0.1em';

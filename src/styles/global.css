@@ -229,7 +229,8 @@ a {
   margin: clamp(2.5rem, 5vw, 4rem) auto 5rem;
 }
 
-.page-main-home {
+.page-main-home,
+.page-main-post {
   width: 100%;
 }
 

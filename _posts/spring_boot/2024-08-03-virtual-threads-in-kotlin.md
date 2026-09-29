@@ -29,7 +29,9 @@ spring:
       enabled: true
 ```
 
-Boot 문서는 사용자 정의 `Executor` bean이 없는 경우 자동 구성되는 `AsyncTaskExecutor`가 가상 스레드를 사용하는 `SimpleAsyncTaskExecutor`가 된다고 설명한다. 이 실행기는 `@EnableAsync` 작업, Spring MVC의 비동기 요청 처리, Spring WebFlux의 blocking execution 지원 등 문서에 지정된 경로에서 사용된다. 스케줄러도 가상 스레드 기반 구현으로 바뀔 수 있다. 직접 만든 `Executor`가 있으면 자동 구성과 선택 규칙이 달라지고, MVC/WebFlux 지원에는 `applicationTaskExecutor`라는 이름의 `AsyncTaskExecutor` 조건도 있다. 따라서 설정의 효과는 **실제로 어떤 executor가 선택됐는지**를 확인해야 알 수 있다. [Spring Boot 3.2 작업 실행과 스케줄링](https://docs.spring.io/spring-boot/docs/3.2.0/reference/html/features.html#features.task-execution-and-scheduling)
+Boot 문서는 사용자 정의 `Executor` bean이 없는 경우 자동 구성되는 `AsyncTaskExecutor`가 가상 스레드를 사용하는 `SimpleAsyncTaskExecutor`가 된다고 설명한다. 이 실행기는 `@EnableAsync` 작업, Spring MVC의 비동기 요청 처리, Spring WebFlux의 blocking execution 지원 등 문서에 지정된 경로에서 사용된다. 스케줄러도 가상 스레드 기반 구현으로 바뀔 수 있다.
+
+직접 만든 `Executor`가 있으면 자동 구성과 선택 규칙이 달라지고, MVC/WebFlux 지원에는 `applicationTaskExecutor`라는 이름의 `AsyncTaskExecutor` 조건도 있다. 따라서 설정의 효과는 **실제로 어떤 executor가 선택됐는지**를 확인해야 알 수 있다. [Spring Boot 3.2 작업 실행과 스케줄링](https://docs.spring.io/spring-boot/docs/3.2.0/reference/html/features.html#features.task-execution-and-scheduling)
 
 Spring Boot 3.2 릴리스 노트는 이 속성을 켠 내장 Tomcat과 Jetty가 요청 처리를 가상 스레드에서 수행한다고도 설명한다. 동기식 MVC controller의 진입 스레드와 `@Async` 작업의 executor는 둘 다 가상 스레드가 될 수 있지만 **서로 다른 진입 경로**다. 코루틴이 중단됐다가 재개되는 경로까지 한 번의 controller 진입 스레드로 설명할 수는 없다. [Spring Boot 3.2 릴리스 노트: Servlet Web Servers](https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-3.2-Release-Notes)
 
