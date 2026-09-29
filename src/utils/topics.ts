@@ -2,10 +2,13 @@
 export const topics = [
   {
     slug: 'research-reviews',
-    startWith: 'parnas-modularity-hidden-decisions',
+    startWith: 'glie-visual-document-retrieval',
     title: '논문·프로젝트 리뷰',
     description: '컴퓨터 과학의 고전과 최근 AI 연구를 원리, 실험 근거, 적용 한계로 읽는 글.',
     posts: [
+      'glie-visual-document-retrieval',
+      'denseon-lateon-multilingual-retrieval',
+      'incr-reexecution-effects',
       'parnas-modularity-hidden-decisions',
       'flashattention-io-to-fp4-bottlenecks',
       'agent-harness-design-evidence',

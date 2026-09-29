@@ -1,5 +1,5 @@
 ---
-title: "FlashAttention에서 FP4까지: 빨라진 행렬곱 다음에 남는 병목"
+title: "FlashAttention·FA4·FP4 — Tri Dao 외, Ted Zadouri 외, Robert Hu의 최적화 연구"
 description: "FlashAttention의 온라인 softmax가 HBM 왕복을 줄이는 원리부터 Blackwell용 FA4와 FP4 후속 연구의 속도·오차·학습 안정성 경계까지 세 논문으로 살펴본다."
 date: 2026-09-29
 categories: [research, ai]
@@ -8,11 +8,21 @@ tags: [paper-review, attention, optimization]
 
 행렬곱이 네 배 빨라지면 attention도 네 배 빨라질까? 2026년 9월의 FP4 연구는 이 예상이 빗나가는 지점을 보여 준다. 점수와 출력을 만드는 행렬곱을 4비트 부동소수점(FP4)으로 계산해도, 그 사이에서 점수를 softmax 확률로 바꾸고 다음 행렬곱이 읽을 수 있게 만드는 시간이 남는다. 게다가 커널 하나가 빨라졌다고 모델 학습이 같은 비율로 빨라지거나, 낮은 정밀도가 긴 학습에서 안정적이라는 뜻도 아니다. [FP4 논문 v1, 1–2쪽·5–6쪽](https://arxiv.org/pdf/2609.04105v1#page=2) [같은 논문, 10쪽 표 6](https://arxiv.org/pdf/2609.04105v1#page=11)
 
-이 글은 서로 다른 세 연구의 질문을 잇는다. 2022년 Tri Dao 등 5명의 **FlashAttention**은 정확한 attention을 유지하면서 GPU의 큰 메모리인 HBM을 오가는 비용을 줄인다. 2026년 3월 Ted Zadouri 등 6명의 **FlashAttention-4(FA4)**는 Blackwell에서 행렬곱 이외의 작업과 온칩 메모리 사용을 다시 짠다. 2026년 9월 **Robert Hu 단독 저자의 _Hardware-Aware FP4 FlashAttention-4_**는 FA4와 기존 FP4 구현을 바탕으로 확률 생성 경로와 학습용 정밀도를 따로 연구한 후속 기술 보고서다. 세 번째 논문을 FA4 원저자들의 같은 연구로 합치면 성능 수치의 책임과 실험 조건이 뒤섞인다. 아래의 성능과 품질 수치는 모두 각 논문의 저자 보고이며, 여기서 GPU 재현 실험을 수행한 값은 없다. [2022년 논문 v1 표지](https://arxiv.org/pdf/2205.14135v1#page=1) [2026년 3월 논문 v1 표지](https://arxiv.org/pdf/2603.05451v1#page=1) [2026년 9월 논문 v1 표지](https://arxiv.org/pdf/2609.04105v1#page=1)
+이 글은 서로 다른 세 연구의 질문을 잇는다. 전체 저자와 고정 판본은 글 끝의 ‘읽은 원문’에 적었다.
+
+| 읽을 연구 | 저자·공개 시점 | 풀려는 병목 |
+| --- | --- | --- |
+| [FlashAttention](https://arxiv.org/abs/2205.14135v1) | Tri Dao 외, 2022년 5월 | 정확한 attention을 유지하며 GPU 메모리 왕복 줄이기 |
+| [FlashAttention-4(FA4)](https://arxiv.org/abs/2603.05451v1) | Ted Zadouri 외, 2026년 3월 | Blackwell의 행렬곱 이외 작업과 온칩 메모리 사용 |
+| [Hardware-Aware FP4 FlashAttention-4](https://arxiv.org/abs/2609.04105v1) | Robert Hu, 2026년 9월 | FP4 확률 생성 경로와 학습용 정밀도 |
+
+세 번째 논문은 **별도 저자의 후속 기술 보고서**다. FA4 원저자들의 같은 연구로 합치면 성능 수치의 책임과 실험 조건이 뒤섞인다. 아래 성능·품질 수치는 각 논문의 저자 보고이며 GPU 재현 실험을 수행한 값은 없다.
 
 ## 첫 번째 비용: `N × N`을 계산하는 것과 저장하는 것은 다르다
 
-한 attention head에서 `N`은 토큰 수, `d`는 head 차원이다. 쿼리 `Q`, 키 `K`, 값 `V`는 각각 `N × d` 행렬이고, 보통 `S = QKᵀ/√d`, `P = softmax(S)`, `O = PV`로 출력을 구한다. Softmax는 `S`의 각 행에 적용된다. 평범하게 세 연산을 별도 커널로 실행하면 `S`와 `P`가 각각 `N × N` 크기로 HBM에 기록되고 다시 읽힌다. 예를 들어 한 head에서 `N=4096`이면 중간 행렬 한 장이 약 1,678만 원소다. 원소가 2바이트라고 가정할 때 행렬 한 장에만 32 MiB가 든다. MiB는 2²⁰바이트다. 이 크기는 설명을 위한 산술값이며 특정 GPU에서 측정한 메모리 사용량이 아니다. [FlashAttention v1, 4쪽 §2.2·Algorithm 0](https://arxiv.org/pdf/2205.14135v1#page=4)
+한 attention head에서 `N`은 토큰 수, `d`는 head 차원이다. 쿼리 `Q`, 키 `K`, 값 `V`는 각각 `N × d` 행렬이고, 보통 `S = QKᵀ/√d`, `P = softmax(S)`, `O = PV`로 출력을 구한다. Softmax는 `S`의 각 행에 적용된다. 평범하게 세 연산을 별도 커널로 실행하면 `S`와 `P`가 각각 `N × N` 크기로 HBM에 기록되고 다시 읽힌다.
+
+예를 들어 한 head에서 `N=4096`이면 중간 행렬 한 장이 약 1,678만 원소다. 원소가 2바이트라고 가정할 때 행렬 한 장에만 32 MiB가 든다. MiB는 2²⁰바이트다. 이 크기는 설명을 위한 산술값이며 특정 GPU에서 측정한 메모리 사용량이 아니다. [FlashAttention v1, 4쪽 §2.2·Algorithm 0](https://arxiv.org/pdf/2205.14135v1#page=4)
 
 FlashAttention은 입력을 작은 블록으로 가져와 더 작고 빠른 온칩 메모리인 SRAM에서 점수, softmax, 출력의 일부를 이어 계산한다. 전체 `S`와 `P`를 HBM에 만들지 않는다.
 
@@ -42,6 +52,12 @@ u′ = exp(m − m′) × u + Σ exp(sⱼ − m′) × vⱼ
 
 최종 출력은 `u′/ℓ′`이다. 새 최댓값 때문에 과거 합의 기준이 바뀌었을 때 `exp(m − m′)`를 곱하는 것이 핵심이다. 이 배율을 빠뜨리면 블록 경계에 따라 결과가 바뀐다. [FlashAttention v1, 4–5쪽 §3.1·Algorithm 1](https://arxiv.org/pdf/2205.14135v1#page=5)
 
+<div class="review-figure">
+<iframe class="review-diagram" src="/assets/diagrams/2026-09-29/research/online-softmax-rescale.html" title="최댓값 변경에 따른 과거 합의 보정" loading="lazy" width="100%" height="540" style="--diagram-height:540px;--diagram-mobile-height:900px" sandbox=""></iframe>
+</div>
+
+*그림은 아래의 자체 산술 예제를 그린 것이다. 새 최댓값에 맞춰 과거 분자와 분모를 같은 배율로 줄여야 블록 경계가 바뀌어도 결과가 같다.*
+
 작은 예로 확인해 보자. `ln`은 자연로그다. 이미 `1/√d`로 조정된 한 쿼리의 점수가 `[0, ln 2, ln 4]`, 대응하는 스칼라 값이 `[10, 20, 40]`이라고 하자. 첫 블록에 앞의 두 원소가 있다면 `m=ln 2`, `ℓ=1/2+1=1.5`, `u=(1/2)·10+1·20=25`다.
 
 다음 블록에서 `ln 4`가 나타나면 새 최대는 `ln 4`이고 과거 합에는 `exp(ln 2−ln 4)=1/2`를 곱한다. 따라서 `ℓ′=0.5·1.5+1=1.75`, `u′=0.5·25+40=52.5`, 출력은 `52.5/1.75=30`이다. 처음부터 계산해도 가중치가 `1:2:4`이므로 `(1·10+2·20+4·40)/7=30`이다. 이 계산은 원리를 보여 주는 자체 산술 예시이지 논문의 GPU 벤치마크가 아니다.
@@ -52,7 +68,9 @@ u′ = exp(m − m′) × u + Σ exp(sⱼ − m′) × vⱼ
 
 ## HBM을 아낀 뒤에는 무엇이 기다리는가
 
-FA4의 출발점은 Blackwell에서 행렬곱 처리량이 더 빨리 증가했다는 관찰이다. 논문은 B200에서 16비트 부동소수점의 한 형식인 BF16 행렬곱 처리량이 H100의 약 두 배가 됐지만, 연산 묶음 하나당 지수 함수 처리량과 공유 메모리 읽기 대역폭은 같은 수준이라고 설명한다. GPU의 행렬 연산 전용 장치인 tensor core만 더 빨라진 셈이다. 따라서 `QKᵀ`와 `PV`만 빨라지면 softmax의 지수 계산과 온칩 공유 메모리 읽기가 상대적으로 도드라진다. HBM 병목을 해결한 뒤에는 다른 단계가 임계 경로가 되는 셈이다. 이는 논문의 하드웨어 수치와 단순화된 처리량 분석에 근거한 설명이지 모든 attention 모양에서 같은 유닛이 병목이라는 선언은 아니다. [FA4 v1, 2–5쪽 §2.2·§3.1.1](https://arxiv.org/pdf/2603.05451v1#page=4)
+FA4의 출발점은 Blackwell에서 행렬곱 처리량이 더 빨리 증가했다는 관찰이다. 논문은 B200에서 16비트 부동소수점의 한 형식인 BF16 행렬곱 처리량이 H100의 약 두 배가 됐지만, 연산 묶음 하나당 지수 함수 처리량과 공유 메모리 읽기 대역폭은 같은 수준이라고 설명한다. GPU의 행렬 연산 전용 장치인 tensor core만 더 빨라진 셈이다.
+
+따라서 `QKᵀ`와 `PV`만 빨라지면 softmax의 지수 계산과 온칩 공유 메모리 읽기가 상대적으로 도드라진다. HBM 병목을 해결한 뒤에는 다른 단계가 임계 경로가 되는 셈이다. 이는 논문의 하드웨어 수치와 단순화된 처리량 분석에 근거한 설명이지 모든 attention 모양에서 같은 유닛이 병목이라는 선언은 아니다. [FA4 v1, 2–5쪽 §2.2·§3.1.1](https://arxiv.org/pdf/2603.05451v1#page=4)
 
 FA4는 Blackwell의 비동기 행렬곱 결과가 저장되는 tensor memory(TMEM)를 활용해, 두 쿼리 타일 중 한쪽이 행렬곱을 하는 동안 다른 쪽이 softmax를 진행하도록 파이프라인을 짠다. 전방에서는 일부 지수 계산을 다항식과 곱셈·덧셈 결합 연산으로 옮기고, 온라인 최대값이 조금 올랐을 때는 매번 출력을 다시 배율 조정하지 않도록 한다. 다항식은 수학적 지수 함수의 근사다. 따라서 2022년 논문의 **정확한 dense attention 알고리즘**이라는 표현을 FA4의 모든 부동소수점 중간값이 엄밀히 같다는 의미로 넓히면 안 된다.
 
@@ -60,13 +78,23 @@ FA4 논문은 400만 난수 입력에서 다항식의 FP32 오차와 BF16 반올
 
 성능 결과의 측정 단위는 attention 커널이다. 논문은 B200, BF16, 여러 시퀀스 길이·head 크기에서 전방 커널이 cuDNN 9.13보다 최대 1.3배, Triton보다 최대 2.7배 빠르고 최대 1613 TFLOP/s(초당 1,613조 회의 부동소수점 연산)에 도달했다고 보고한다.
 
+[![FA4 원문 그림 4: B200에서 시퀀스 길이별 전방 attention 처리량](/assets/images/research/fa4-figure4.png)](/assets/images/research/fa4-figure4.png)
+
+*Ted Zadouri 외, FlashAttention-4 v1, [PDF 15쪽 그림 4](https://arxiv.org/pdf/2603.05451v1#page=15), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). 그래프 영역만 잘랐으며 그래프 내용은 바꾸지 않았다. 이미지를 누르면 크게 볼 수 있다.*
+
+가로축은 시퀀스 길이, 세로축은 초당 부동소수점 연산량이다. 왼쪽은 비인과 attention, 오른쪽은 인과 attention이며 두 그래프 모두 head 차원 128이다. 한 길이의 가장 높은 막대를 전체 모델의 가속 비율로 읽으면 안 된다.
+
 이것은 모델 전체 학습 시간의 배율이 아니다. 같은 그림의 캡션은 후속 cuDNN 버전이 일부 기법을 받아들여 비슷한 성능에 이르렀다고 덧붙인다. [FA4 v1, 14쪽 표 4](https://arxiv.org/pdf/2603.05451v1#page=14) [15–16쪽 §5·그림 4–6](https://arxiv.org/pdf/2603.05451v1#page=15)
 
 ## FP4는 왜 행렬곱만 바꿔서는 끝나지 않나
 
-Robert Hu의 9월 보고서는 먼저 **추론용 전방**과 **학습용 인과 attention**을 분리한다. 전방의 `full FP4`는 attention 안의 `Q,K,P,V` 네 피연산자가 FP4라는 뜻이다. 모델의 선형 변환(projection), 정규화, 손실 계산까지 전부 FP4라는 뜻이 아니다. 특히 `P`는 입력에서 읽는 피연산자가 아니라 `QKᵀ` 점수를 softmax로 바꿔 **커널 안에서 새로 만들어야 하는 피연산자**다. FP4 행렬곱 자체가 짧아질수록 점수의 최대값 계산, 확률 표현, 스케일 기록, 다음 `PV`가 읽을 수 있다는 신호를 보내는 일이 지연을 결정한다. [FP4 보고서 v1, 1–2쪽 §1](https://arxiv.org/pdf/2609.04105v1#page=2) [5쪽 §3.1](https://arxiv.org/pdf/2609.04105v1#page=6)
+Robert Hu의 9월 보고서는 먼저 **추론용 전방**과 **학습용 인과 attention**을 분리한다. 전방의 `full FP4`는 attention 안의 `Q,K,P,V` 네 피연산자가 FP4라는 뜻이다. 모델의 선형 변환(projection), 정규화, 손실 계산까지 전부 FP4라는 뜻이 아니다.
 
-제안한 Direct-P는 이 중 점수에서 FP4 확률 `P`를 만드는 구간을 줄인다. 점수를 먼저 높은 정밀도의 지수값으로 만든 다음 4비트 코드로 버리는 대신, 점수에서 지수 2비트·가수 1비트를 쓰는 E2M1 표현의 반올림 구간을 바로 고른다. 여기서 NVFP4와 MXFP4는 여러 값이 스케일을 공유하는 서로 다른 4비트 표현 방식이다. `Q,K`에는 NVFP4, `P,V`에는 32개 값이 2의 거듭제곱 스케일을 공유하는 MXFP4를 쓴다. 이 선택은 표현 범위와 코드 생성 비용의 절충이다. 값이 0으로 양자화되거나 코드 경계가 달라질 수 있으므로 **2022년의 정확한 attention과는 다른 근사 연산**이다.
+특히 `P`는 입력에서 읽는 피연산자가 아니라 `QKᵀ` 점수를 softmax로 바꿔 **커널 안에서 새로 만들어야 하는 피연산자**다. FP4 행렬곱 자체가 짧아질수록 점수의 최대값 계산, 확률 표현, 스케일 기록, 다음 `PV`가 읽을 수 있다는 신호를 보내는 일이 지연을 결정한다. [FP4 보고서 v1, 1–2쪽 §1](https://arxiv.org/pdf/2609.04105v1#page=2) [5쪽 §3.1](https://arxiv.org/pdf/2609.04105v1#page=6)
+
+제안한 Direct-P는 이 중 점수에서 FP4 확률 `P`를 만드는 구간을 줄인다. 점수를 먼저 높은 정밀도의 지수값으로 만든 다음 4비트 코드로 버리는 대신, 점수에서 지수 2비트·가수 1비트를 쓰는 E2M1 표현의 반올림 구간을 바로 고른다. 여기서 NVFP4와 MXFP4는 여러 값이 스케일을 공유하는 서로 다른 4비트 표현 방식이다. `Q,K`에는 NVFP4, `P,V`에는 32개 값이 2의 거듭제곱 스케일을 공유하는 MXFP4를 쓴다. 이 선택은 표현 범위와 코드 생성 비용의 절충이다.
+
+값이 0으로 양자화되거나 코드 경계가 달라질 수 있으므로 **2022년의 정확한 attention과는 다른 근사 연산**이다.
 
 더구나 분자 `PV`가 실제로 소비한 반올림 확률과 분모가 서로 다르면 출력에 추가 불일치가 생긴다. Direct-P는 분모도 같은 코드와 스케일에서 합산해 이 불일치를 피한다. [FP4 보고서 v1, 6–10쪽 표 2–4·§4.2–4.3](https://arxiv.org/pdf/2609.04105v1#page=8)
 
@@ -104,10 +132,12 @@ Robert Hu의 9월 보고서는 먼저 **추론용 전방**과 **학습용 인과
 
 실제로 저자들이 마지막 Direct-P 커널에서 거의 모든 확률 생성 작업을 빼 본 *정답을 계산하지 않는 진단*은 실행 시간을 5.23%만 줄였다. 남은 시간을 다항식 하나로 없앨 수 없다는 근거이고, 추가 점수 버퍼나 다른 `PV` 발행 단위는 아직 측정된 개선이 아니라 제안이다. [FlashAttention v1, 6쪽 그림 2](https://arxiv.org/pdf/2205.14135v1#page=6) [FA4 v1, 10–12쪽 표 3](https://arxiv.org/pdf/2603.05451v1#page=11) [FP4 보고서 v1, 28–30쪽 표 15–17·§8.4–8.5](https://arxiv.org/pdf/2609.04105v1#page=29)
 
-자신의 모델에 이 연구를 적용할 때 먼저 **무엇의 시간과 무엇의 오차를 비교하는지** 적어 보면 판단이 쉬워진다. 같은 `N`, head 차원, 마스크, GPU에서 attention 커널을 재는가, 양자화와 projection까지 포함하는가, optimizer와 통신이 들어간 전체 업데이트인가? 전방 출력의 cosine뿐 아니라 크기 오차와 실제 과제 결과를 보았는가? 학습이면 한 번의 빠른 업데이트를 넘어 같은 토큰 지점의 검증 손실과 여러 궤적을 확인했는가? 측정 경계가 달라지는 순간, 앞 문장의 ‘2배’는 다음 문장의 ‘2배’가 아니다. [FP4 보고서 v1, 10쪽 표 6](https://arxiv.org/pdf/2609.04105v1#page=11) [30–31쪽 §8.5](https://arxiv.org/pdf/2609.04105v1#page=31)
+자신의 모델에 이 연구를 적용할 때 먼저 **무엇의 시간과 무엇의 오차를 비교하는지** 적어 보면 판단이 쉬워진다. 같은 `N`, head 차원, 마스크, GPU에서 attention 커널을 재는가, 양자화와 projection까지 포함하는가, optimizer와 통신이 들어간 전체 업데이트인가? 전방 출력의 cosine뿐 아니라 크기 오차와 실제 과제 결과를 보았는가?
+
+학습이면 한 번의 빠른 업데이트를 넘어 같은 토큰 지점의 검증 손실과 여러 궤적을 확인했는가? 측정 경계가 달라지는 순간, 앞 문장의 ‘2배’는 다음 문장의 ‘2배’가 아니다. [FP4 보고서 v1, 10쪽 표 6](https://arxiv.org/pdf/2609.04105v1#page=11) [30–31쪽 §8.5](https://arxiv.org/pdf/2609.04105v1#page=31)
 
 ### 읽은 원문
 
-- Tri Dao 외, [_FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness_](https://arxiv.org/abs/2205.14135v1), arXiv:2205.14135v1, 2022-05-27. 이 글에서는 v1의 알고리즘·HBM 분석·실험·한계를 확인했다.
-- Ted Zadouri 외, [_FlashAttention-4: Algorithm and Kernel Pipelining Co-Design for Asymmetric Hardware Scaling_](https://arxiv.org/abs/2603.05451v1), arXiv:2603.05451v1, 2026-03-05. v1의 Blackwell 분석·전후방 설계·B200 커널 측정을 확인했다.
+- Tri Dao, Daniel Y. Fu, Stefano Ermon, Atri Rudra, Christopher Ré, [_FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness_](https://arxiv.org/abs/2205.14135v1), arXiv:2205.14135v1, 2022-05-27. 이 글에서는 v1의 알고리즘·HBM 분석·실험·한계를 확인했다.
+- Ted Zadouri, Markus Hoehnerbach, Jay Shah, Timmy Liu, Vijay Thakkar, Tri Dao, [_FlashAttention-4: Algorithm and Kernel Pipelining Co-Design for Asymmetric Hardware Scaling_](https://arxiv.org/abs/2603.05451v1), arXiv:2603.05451v1, 2026-03-05. v1의 Blackwell 분석·전후방 설계·B200 커널 측정을 확인했다.
 - Robert Hu, [_Hardware-Aware FP4 FlashAttention-4_](https://arxiv.org/abs/2609.04105v1), arXiv:2609.04105v1, 2026-09-03. 별도 후속 기술 보고서 v1의 Direct-P, 커널·하위층·전체 업데이트·분산 학습 측정과 한계를 확인했다.

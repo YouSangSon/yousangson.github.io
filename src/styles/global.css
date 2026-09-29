@@ -754,3 +754,22 @@ html.dark .code-copy-button.copied {
   text-decoration: underline;
   text-underline-offset: .25em;
 }
+
+/* Embedded review figures switch with article width, not viewport width. */
+.review-figure {
+  container-type: inline-size;
+  margin-block: 2rem 1rem;
+}
+
+.review-diagram {
+  display: block;
+  width: 100%;
+  height: var(--diagram-height);
+  border: 0;
+}
+
+@container (max-width: 640px) {
+  .review-diagram {
+    height: var(--diagram-mobile-height);
+  }
+}
