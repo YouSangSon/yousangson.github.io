@@ -9,9 +9,11 @@ import BackButton from '@/components/Widgets/BackButton.astro'
 import TOC from '@/components/Widgets/TOC.astro'
 import { allLocales } from '@/config'
 import { getLangFromLocale, getLangRouteParam } from '@/i18n/lang'
+import { getLocalizedPath } from '@/i18n/path'
 import Layout from '@/layouts/Layout.astro'
 import { checkPostSlugDuplication } from '@/utils/content'
 import { getPostDescription } from '@/utils/description'
+import { getPostTopic } from '@/utils/topics'
 
 export async function getStaticPaths() {
   const posts: CollectionEntry<'posts'>[] = await getCollection('posts')
@@ -77,6 +79,7 @@ const { post, supportedLangs } = Astro.props
 const currentLang = getLangFromLocale(Astro.currentLocale)
 const slug = post.data.abbrlink || post.id
 const description = getPostDescription(post, 'meta')
+const topic = getPostTopic(slug)
 const { Content, headings, remarkPluginFrontmatter } = await render(post)
 ---
 
@@ -86,6 +89,7 @@ const { Content, headings, remarkPluginFrontmatter } = await render(post)
   postSlug={slug}
   supportedLangs={supportedLangs}
 >
+  {topic && <nav class="post-topic no-heti" aria-label="글 카테고리"><a href={getLocalizedPath('/categories/', currentLang)}>카테고리</a><span aria-hidden="true"> / </span><a href={getLocalizedPath(`/topics/${topic.slug}/`, currentLang)}>{topic.title}</a></nav>}
   <article class="heti">
     <div class="relative">
       <!-- Go Back Button On Desktop -->

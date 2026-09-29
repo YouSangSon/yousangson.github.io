@@ -1,0 +1,32 @@
+---
+import type { Language } from '@/i18n/config'
+import type { Post } from '@/types'
+import { getLocalizedPath } from '@/i18n/path'
+import { topics } from '@/utils/topics'
+
+interface Props {
+  posts: Post[]
+  lang: Language
+  compact?: boolean
+  currentTopic?: string
+}
+const { posts, lang, compact = false, currentTopic } = Astro.props
+const slugs = new Set(posts.map(post => post.data.abbrlink || post.id))
+const availableTopics = topics.map(topic => ({
+  ...topic,
+  count: topic.posts.filter(slug => slugs.has(slug)).length,
+})).filter(topic => topic.count > 0)
+---
+
+<nav aria-label="분야별 글" class:list={['topic-directory', compact && 'is-compact']}>
+  <ul class="topic-grid">
+    {availableTopics.map(topic => (
+      <li>
+        <a class="topic-card" href={getLocalizedPath(`/topics/${topic.slug}/`, lang)} aria-current={currentTopic === topic.slug ? 'page' : undefined}>
+          <span class="topic-card-heading"><span>{topic.title}</span><span class="topic-count">{topic.count}편</span></span>
+          {!compact && <span class="topic-description">{topic.description}</span>}
+        </a>
+      </li>
+    ))}
+  </ul>
+</nav>

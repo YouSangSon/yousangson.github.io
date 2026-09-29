@@ -12,10 +12,10 @@ export interface Props {
   lang: Language
   pinned?: boolean
   headingLevel?: 'h2' | 'h3'
+  showDescription?: boolean
 }
 
-const { posts, lang, pinned = false, headingLevel: Heading = 'h2' } = Astro.props
-const isHome = isHomePage(Astro.url.pathname)
+const { posts, lang, pinned = false, headingLevel: Heading = 'h2', showDescription = isHomePage(Astro.url.pathname) } = Astro.props
 ---
 
 <ul class="post-list">
@@ -56,7 +56,7 @@ const isHome = isHomePage(Astro.url.pathname)
             />
           </div>
 
-          {isHome && (
+          {showDescription && (
             <div class="post-list-description">
               <p>{getPostDescription(post, 'list')}</p>
             </div>

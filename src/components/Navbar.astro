@@ -6,7 +6,7 @@ const { currentLang, isHome, isPost, isTag, isAbout, getLocalizedPath } = getPag
 const currentUI = ui[currentLang as keyof typeof ui] ?? {}
 
 const isPostActive = isHome || isPost
-const isTagActive = isTag
+const isTagActive = isTag || /\/(?:categories|topics)(?:\/|$)/.test(Astro.url.pathname)
 const isAboutActive = isAbout
 const isSearchActive = /\/search\/?$/.test(Astro.url.pathname)
 
@@ -17,8 +17,8 @@ const navItems = [
     active: isPostActive,
   },
   {
-    href: '/tags/',
-    label: currentLang === 'ko' ? '주제' : currentUI.tags,
+    href: '/categories/',
+    label: currentLang === 'ko' ? '카테고리' : currentUI.tags,
     active: isTagActive,
   },
   {

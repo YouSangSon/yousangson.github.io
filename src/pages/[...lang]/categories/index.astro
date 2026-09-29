@@ -1,20 +1,25 @@
 ---
-import CategoryList from '@/components/CategoryList.astro'
+import TopicList from '@/components/TopicList.astro'
 import { allLocales } from '@/config'
 import { getLangFromLocale, getLangRouteParam } from '@/i18n/lang'
+import { getLocalizedPath } from '@/i18n/path'
 import Layout from '@/layouts/Layout.astro'
-import { getAllCategories } from '@/utils/content'
+import { getPosts } from '@/utils/content'
 
 export function getStaticPaths() {
   return allLocales.map(lang => ({ params: { lang: getLangRouteParam(lang) } }))
 }
 
 const currentLang = getLangFromLocale(Astro.currentLocale)
-const categories = await getAllCategories(currentLang)
+const posts = await getPosts(currentLang)
 ---
 
-<Layout postTitle="카테고리" postDescription="주제별 개발 기록">
-  <div class="uno-decorative-line" />
-  <h1 class="mb-6 text-7 c-primary font-bold">카테고리</h1>
-  <CategoryList {categories} lang={currentLang} />
+<Layout postTitle="카테고리" postDescription="관심 있는 분야부터 찾아 읽는 개발 기록">
+  <header class="topic-page-heading">
+    <p class="section-eyebrow">분야별로 읽기 · 전체 {posts.length}편</p>
+    <h1>어떤 주제가 궁금한가요?</h1>
+    <p>관심 있는 분야를 고르면 글의 요약을 함께 볼 수 있습니다.</p>
+  </header>
+  <TopicList {posts} lang={currentLang} />
+  <p class="topic-other-links"><a href={getLocalizedPath('/archives/', currentLang)}>전체 글을 날짜순으로</a><a href={getLocalizedPath('/tags/', currentLang)}>기술 태그로 찾기</a></p>
 </Layout>

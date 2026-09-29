@@ -1,0 +1,39 @@
+---
+import PostList from '@/components/PostList.astro'
+import TopicList from '@/components/TopicList.astro'
+import { allLocales } from '@/config'
+import { getLangFromLocale, getLangRouteParam } from '@/i18n/lang'
+import { getLocalizedPath, getPostPath } from '@/i18n/path'
+import Layout from '@/layouts/Layout.astro'
+import { getPosts } from '@/utils/content'
+import { topics } from '@/utils/topics'
+
+export async function getStaticPaths() {
+  return (await Promise.all(allLocales.map(async (lang) => {
+    const posts = await getPosts(lang)
+    return topics.filter(topic => posts.some(post => topic.posts.includes(post.data.abbrlink || post.id)))
+      .map(topic => ({ params: { lang: getLangRouteParam(lang), topic: topic.slug }, props: { topic } }))
+  }))).flat()
+}
+
+const { topic } = Astro.props
+const currentLang = getLangFromLocale(Astro.currentLocale)
+const allPosts = await getPosts(currentLang)
+const starter = allPosts.find(post => (post.data.abbrlink || post.id) === topic.startWith)
+const posts = allPosts.filter(post => topic.posts.includes(post.data.abbrlink || post.id))
+---
+
+<Layout postTitle={topic.title} postDescription={topic.description}>
+  <header class="topic-page-heading">
+    <a class="topic-back" href={getLocalizedPath('/categories/', currentLang)}>← 전체 카테고리</a>
+    <h1>{topic.title}</h1>
+    <p>{topic.description}</p>
+    <p class="section-eyebrow">{posts.length}편 · 최신순</p>
+  </header>
+  {starter && <aside class="topic-start"><span class="section-eyebrow">처음 읽는다면</span><a href={getPostPath(topic.startWith, currentLang)}>{starter.data.title} <span aria-hidden="true">→</span></a></aside>}
+  <PostList {posts} lang={currentLang} showDescription />
+  <section class="topic-more" aria-labelledby="other-topics-heading">
+    <h2 id="other-topics-heading">다른 분야도 읽어보세요</h2>
+    <TopicList posts={allPosts} lang={currentLang} compact currentTopic={topic.slug} />
+  </section>
+</Layout>

@@ -1,6 +1,7 @@
 ---
 import PostDate from '@/components/PostDate.astro'
 import PostList from '@/components/PostList.astro'
+import TopicList from '@/components/TopicList.astro'
 import { allLocales } from '@/config'
 import { getLangFromLocale, getLangRouteParam } from '@/i18n/lang'
 import { getLocalizedPath, getPostPath } from '@/i18n/path'
@@ -15,11 +16,16 @@ export async function getStaticPaths() {
 }
 
 const currentLang = getLangFromLocale(Astro.currentLocale)
-const posts = (await getPosts(currentLang)).slice(0, 10)
+const allPosts = await getPosts(currentLang)
+const posts = allPosts.slice(0, 10)
 const [featured, companion] = posts
 ---
 
 <Layout>
+  <section class="home-topics" aria-labelledby="home-topics-heading">
+    <div class="home-topics-heading"><h2 id="home-topics-heading">관심 있는 분야부터</h2><a href={getLocalizedPath('/categories/', currentLang)}>전체 {allPosts.length}편 둘러보기 →</a></div>
+    <TopicList posts={allPosts} lang={currentLang} compact />
+  </section>
   {featured && (
     <section class="featured-note" aria-labelledby="featured-heading">
       <div class="featured-copy">

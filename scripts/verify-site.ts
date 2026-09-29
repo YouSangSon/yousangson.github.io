@@ -5,6 +5,7 @@ import process from 'node:process'
 import { runInNewContext } from 'node:vm'
 import glob from 'fast-glob'
 import { parse } from 'node-html-parser'
+import { topics } from '../src/utils/topics'
 
 const distDir = 'dist'
 const siteOrigin = 'https://yousangson.github.io'
@@ -82,6 +83,7 @@ async function checkUrlsAndReferences() {
     glob('_posts/**/*.{md,markdown}'),
   ])
   const files = new Set(filesList)
+  check(!files.has('assets/images/yubu.JPG'), 'retired private-metadata asset was rebuilt')
   const existingUrls = JSON.parse(manifestText) as string[]
   const existingPaths = existingUrls.map(value => new URL(value))
 
@@ -92,6 +94,11 @@ async function checkUrlsAndReferences() {
   }
 
   const builtPosts = await glob('posts/**/index.html', { cwd: distDir })
+  const retiredSlugs = JSON.parse(await fs.readFile('scripts/retired-posts.json', 'utf8')) as string[]
+  for (const slug of retiredSlugs) {
+    check(!sourcePosts.some(file => file.endsWith(`-${slug}.md`)), `retired post source returned: ${slug}`)
+    check(!files.has(`posts/${slug}/index.html`), `retired post was rebuilt: ${slug}`)
+  }
   check(builtPosts.length === sourcePosts.length, `post count differs: ${sourcePosts.length} sources, ${builtPosts.length} outputs`)
   for (const removedPath of removedPostPaths)
     check(!outputFileForPathname(removedPath, files), `removed post was rebuilt: ${removedPath}`)
@@ -102,6 +109,27 @@ async function checkUrlsAndReferences() {
   const roots = new Map<string, ReturnType<typeof parse>>()
   for (const htmlFile of htmlFiles)
     roots.set(htmlFile, parse(await fs.readFile(path.join(distDir, htmlFile), 'utf8')))
+
+  // Coverage is based on the published corpus, not a fixed number of articles.
+  const publishedSlugs = new Set(builtPosts.map(file => file.split('/')[1]))
+  const assignedSlugs = topics.flatMap(topic => topic.posts)
+  check(new Set(topics.map(topic => topic.slug)).size === topics.length, 'duplicate topic slug')
+  check(new Set(assignedSlugs).size === assignedSlugs.length, 'a post belongs to multiple primary topics')
+  check(assignedSlugs.length === publishedSlugs.size && assignedSlugs.every(slug => publishedSlugs.has(slug)), 'topic catalog must cover every published post exactly once')
+  for (const topic of topics) {
+    check(topic.posts.includes(topic.startWith), `starting article must belong to topic: ${topic.slug}`)
+    const root = roots.get(`topics/${topic.slug}/index.html`)
+    const links = root?.querySelectorAll('.post-list-link').map(node => node.getAttribute('href')) ?? []
+    check(topic.posts.length > 0 && links.length === topic.posts.length, `topic count differs: ${topic.slug}`)
+    check(topic.posts.every(slug => links.includes(`/posts/${slug}/`)), `topic membership differs: ${topic.slug}`)
+    check(root?.querySelectorAll('.post-list-description').length === links.length, `missing article summaries: ${topic.slug}`)
+  }
+  const cards = roots.get('categories/index.html')?.querySelectorAll('.topic-card') ?? []
+  check(cards.length === topics.length, 'category directory must show every topic')
+  for (const topic of topics) {
+    const card = cards.find(node => node.getAttribute('href') === `/topics/${topic.slug}/`)
+    check(card?.querySelector('.topic-count')?.text === `${topic.posts.length}편`, `directory count differs: ${topic.slug}`)
+  }
 
   const checkReference = (raw: string, sourceFile: string, sourceUrl: string, verifyHash: boolean) => {
     const url = internalUrl(raw.trim(), sourceUrl)
