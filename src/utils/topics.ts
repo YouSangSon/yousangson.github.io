@@ -1,6 +1,19 @@
 // Reader-facing topics; each published post belongs to exactly one topic.
 export const topics = [
   {
+    slug: 'research-reviews',
+    startWith: 'parnas-modularity-hidden-decisions',
+    title: '논문·프로젝트 리뷰',
+    description: '컴퓨터 과학의 고전과 최근 AI 연구를 원리, 실험 근거, 적용 한계로 읽는 글.',
+    posts: [
+      'parnas-modularity-hidden-decisions',
+      'flashattention-io-to-fp4-bottlenecks',
+      'agent-harness-design-evidence',
+      'ai-observability-signals-and-causes',
+      'awesome-ai-engineering-evaluation-first',
+    ],
+  },
+  {
     slug: 'ai-search',
     startWith: 'immutable-versions-through-rag-pipeline',
     title: 'AI·RAG·검색',
