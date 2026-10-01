@@ -6,7 +6,7 @@ categories: [research, ai]
 tags: [paper-review, attention, optimization]
 ---
 
-행렬곱이 네 배 빨라지면 attention도 네 배 빨라질까? 2026년 9월의 FP4 연구에서는 그렇게 되지 않는 이유를 살펴본다. 점수와 출력을 만드는 행렬곱을 4비트 부동소수점(FP4)으로 계산해도, 그 사이에서 점수를 softmax 확률로 바꾸고 다음 행렬곱이 읽을 수 있게 만드는 시간이 남는다. 게다가 커널 하나가 빨라졌다고 모델 학습이 같은 비율로 빨라지거나, 낮은 정밀도가 긴 학습에서 안정적이라는 뜻도 아니다. [FP4 논문 v1, 1–2쪽·5–6쪽](https://arxiv.org/pdf/2609.04105v1#page=2) [같은 논문, 10쪽 표 6](https://arxiv.org/pdf/2609.04105v1#page=11)
+행렬곱이 네 배 빨라지면 attention도 네 배 빨라질까? 2026년 9월의 FP4 연구에서는 그렇게 되지 않는 이유를 살펴본다. 점수와 출력을 만드는 행렬곱을 4비트 부동소수점(FP4)으로 계산해도, 그 사이에서 점수를 softmax 확률로 바꾸고 다음 행렬곱이 읽을 수 있게 만드는 시간이 남는다. 게다가 커널 하나가 빨라졌다고 모델 학습이 같은 비율로 빨라지거나, 낮은 정밀도가 긴 학습에서 안정적이라는 뜻도 아니다. [FP4 후속 연구](https://arxiv.org/pdf/2609.04105v1#page=2)
 
 어떤 비용을 줄였고 그 뒤에는 무엇이 남았는지, 세 연구를 차례로 따라가 보자. 전체 저자와 판본은 글 끝의 ‘참고 논문’에 적었다.
 
@@ -22,17 +22,17 @@ tags: [paper-review, attention, optimization]
 
 한 attention head에서 `N`은 토큰 수, `d`는 head 차원이다. 쿼리 `Q`, 키 `K`, 값 `V`는 각각 `N × d` 행렬이고, 보통 `S = QKᵀ/√d`, `P = softmax(S)`, `O = PV`로 출력을 구한다. Softmax는 `S`의 각 행에 적용된다. HBM(High Bandwidth Memory)은 GPU 칩 밖에 있는 대용량 메모리다. 용량이 큰 대신 칩 안의 작업 공간과 데이터를 주고받는 비용이 든다. 평범하게 세 연산을 별도 커널로 실행하면 `S`와 `P`가 각각 `N × N` 크기로 HBM에 기록되고 다시 읽힌다.
 
-예를 들어 한 head에서 `N=4096`이면 중간 행렬 한 장이 약 1,678만 원소다. 원소가 2바이트라고 가정할 때 행렬 한 장에만 32 MiB가 든다. MiB는 2²⁰바이트다. 이 크기는 설명을 위한 산술값이며 특정 GPU에서 측정한 메모리 사용량이 아니다. [FlashAttention v1, 4쪽 §2.2·Algorithm 0](https://arxiv.org/pdf/2205.14135v1#page=4)
+예를 들어 한 head에서 `N=4096`이면 중간 행렬 한 장이 약 1,678만 원소다. 원소가 2바이트라고 가정할 때 행렬 한 장에만 32 MiB가 든다. MiB는 2²⁰바이트다. 이 크기는 설명을 위한 산술값이며 특정 GPU에서 측정한 메모리 사용량이 아니다. [FlashAttention 원문](https://arxiv.org/pdf/2205.14135v1#page=4)
 
 FlashAttention은 입력을 작은 블록으로 가져와 더 작고 빠른 온칩 메모리인 SRAM에서 점수, softmax, 출력의 일부를 이어 계산한다. 전체 `S`와 `P`를 HBM에 만들지 않는다.
 
 역전파에 필요한 중간 행렬도 전부 저장하는 대신 블록별로 재계산한다. 그래서 **정확한 dense attention의 산술량은 여전히 `O(N²d)`**이지만, 입력·출력을 제외한 추가 메모리는 논문의 알고리즘에서 `O(N)`이고, 비싼 HBM 접근은 줄어든다.
 
-논문의 `exact`는 토큰 쌍을 근사적으로 생략하지 않고 같은 attention 식을 계산한다는 뜻이다. 유한 정밀도 연산에서 다른 커널과 비트 단위로 같은 결과를 보장한다는 말은 아니다. [FlashAttention v1, 4–6쪽 §3.1–3.2·정리 1–2](https://arxiv.org/pdf/2205.14135v1#page=5)
+논문의 `exact`는 토큰 쌍을 근사적으로 생략하지 않고 같은 attention 식을 계산한다는 뜻이다. 유한 정밀도 연산에서 다른 커널과 비트 단위로 같은 결과를 보장한다는 말은 아니다. [FlashAttention 원문](https://arxiv.org/pdf/2205.14135v1#page=5)
 
 블록을 어떻게 읽는지 보면 HBM 접근이 줄어드는 이유도 알 수 있다. 원래 구현은 점수와 확률의 모든 `N²` 원소를 HBM에 내보낸다. FlashAttention은 SRAM에 들어갈 만큼의 `K,V` 블록을 잡고 `Q` 블록을 순회한다. 이때 `Q`와 출력 일부를 다시 읽고 쓸 수는 있지만, `N × N` 중간 행렬의 왕복을 없앤다.
 
-논문은 SRAM 크기를 원소 수 `M`으로 놓고 `d ≤ M ≤ Nd`인 범위에서 표준 구현의 접근량을 `Θ(Nd + N²)`, 제시한 방식의 접근량을 `Θ(N²d²/M)`으로 분석한다. `Θ`는 상수 배수를 제외했을 때 입력 크기에 따라 증가하는 정도를 나타낸다. 따라서 `M`, `d`, 실제 블록 크기에 따라 이득이 달라지며, 블록을 무한정 키울 수도 없다. 저자들의 A100 실험에서도 블록이 커질수록 HBM 접근과 실행 시간이 줄었다. 하지만 다른 연산 비용과 SRAM 용량 때문에 계속 같은 이득을 얻지는 못했다. [FlashAttention v1, 6쪽 정리 2·그림 2](https://arxiv.org/pdf/2205.14135v1#page=6)
+논문은 SRAM 크기를 원소 수 `M`으로 놓고 `d ≤ M ≤ Nd`인 범위에서 표준 구현의 접근량을 `Θ(Nd + N²)`, 제시한 방식의 접근량을 `Θ(N²d²/M)`으로 분석한다. `Θ`는 상수 배수를 제외했을 때 입력 크기에 따라 증가하는 정도를 나타낸다. 따라서 `M`, `d`, 실제 블록 크기에 따라 이득이 달라지며, 블록을 무한정 키울 수도 없다. 저자들의 A100 실험에서도 블록이 커질수록 HBM 접근과 실행 시간이 줄었다. 하지만 다른 연산 비용과 SRAM 용량 때문에 계속 같은 이득을 얻지는 못했다. [FlashAttention 원문](https://arxiv.org/pdf/2205.14135v1#page=6)
 
 같은 그림의 왼쪽 비교는 계산량과 메모리 접근량을 나란히 보여 준다.
 
@@ -41,7 +41,7 @@ FlashAttention은 입력을 작은 블록으로 가져와 더 작고 빠른 온�
 | 표준 구현 | 66.6 GFLOPs | 40.3 GB | 41.7 ms |
 | FlashAttention | 75.2 GFLOPs | 4.4 GB | 7.3 ms |
 
-*FlashAttention v1, PDF 6쪽 그림 2의 왼쪽 표를 재구성했다. GPT-2 medium, 시퀀스 길이 1024, head 차원 64, head 16개, 배치 64 조건이다. GFLOPs는 이 실행의 부동소수점 연산 수를 10억 단위로 센 값이며 초당 처리량이 아니다.*
+*FlashAttention v1 그림 2의 왼쪽 표를 재구성했다. GPT-2 medium, 시퀀스 길이 1024, head 차원 64, head 16개, 배치 64 조건이다. GFLOPs는 이 실행의 부동소수점 연산 수를 10억 단위로 센 값이며 초당 처리량이 아니다.*
 
 재계산 때문에 연산 수는 늘었지만 HBM 왕복이 크게 줄어 실행 시간은 짧아졌다. “연산을 덜 해야 빨라진다”는 생각만으로는 설명할 수 없는 결과다. 오른쪽의 희소 attention 실험은 일부 토큰 쌍을 생략하는 별도 설정이므로 이 두 행에 섞지 않았다.
 
@@ -61,7 +61,7 @@ m′ = max(m, 새 블록의 최댓값)
 u′ = exp(m − m′) × u + Σ exp(sⱼ − m′) × vⱼ
 ```
 
-최종 출력은 `u′/ℓ′`이다. 새 최댓값 때문에 과거 합의 기준이 바뀌었을 때 `exp(m − m′)`를 곱하는 것이 핵심이다. 이 배율을 빠뜨리면 블록 경계에 따라 결과가 바뀐다. [FlashAttention v1, 4–5쪽 §3.1·Algorithm 1](https://arxiv.org/pdf/2205.14135v1#page=5)
+최종 출력은 `u′/ℓ′`이다. 새 최댓값 때문에 과거 합의 기준이 바뀌었을 때 `exp(m − m′)`를 곱하는 것이 핵심이다. 이 배율을 빠뜨리면 블록 경계에 따라 결과가 바뀐다. [FlashAttention 원문](https://arxiv.org/pdf/2205.14135v1#page=5)
 
 <div class="review-figure">
 <iframe class="review-diagram" src="/assets/diagrams/2026-09-29/research/online-softmax-rescale.html" title="최댓값 변경에 따른 과거 합의 보정" loading="lazy" width="100%" height="540" style="--diagram-height:540px;--diagram-mobile-height:900px" sandbox=""></iframe>
@@ -75,7 +75,7 @@ u′ = exp(m − m′) × u + Σ exp(sⱼ − m′) × vⱼ
 
 [표준 라이브러리만 쓰는 실행 예제](/assets/examples/2026-09-29/paper-reviews/online_softmax_demo.py)를 `python3 online_softmax_demo.py`로 실행하면 같은 결과를 확인할 수 있다. 블록 크기를 바꿔도 출력은 30으로 유지되며, 과거 합의 배율 조정을 생략한 대조 구현은 26을 낸다. 큰 점수에서도 전체 계산과 블록별 계산이 허용 오차 안에서 같은지 검사한다.
 
-2022년 논문에는 실제 모델 학습 결과도 있다. 같은 초기값에서 목표 masked-language-modeling 정확도에 도달하는 BERT-large 실험은 8×A100에서 기존 NVIDIA MLPerf 1.1 구현 20.0±1.5분, FlashAttention 구현 17.4±1.4분으로 보고됐다. GPT-2 실험은 별도 구현·데이터·학습 일정이므로 이 수치를 현재 모델이나 다른 GPU의 보편적인 속도 배율로 옮기면 안 된다. 논문 자체도 구현마다 새 CUDA 커널이 필요하고 GPU 구조가 바뀌면 코드를 옮기기 어렵다는 한계를 적었다. [FlashAttention v1, 7쪽 표 1](https://arxiv.org/pdf/2205.14135v1#page=7) [10쪽 §5](https://arxiv.org/pdf/2205.14135v1#page=10)
+2022년 논문에는 실제 모델 학습 결과도 있다. 같은 초기값에서 목표 masked-language-modeling 정확도에 도달하는 BERT-large 실험은 8×A100에서 기존 NVIDIA MLPerf 1.1 구현 20.0±1.5분, FlashAttention 구현 17.4±1.4분으로 보고됐다. GPT-2 실험은 별도 구현·데이터·학습 일정이므로 이 수치를 현재 모델이나 다른 GPU의 보편적인 속도 배율로 옮기면 안 된다. 논문 자체도 구현마다 새 CUDA 커널이 필요하고 GPU 구조가 바뀌면 코드를 옮기기 어렵다는 한계를 적었다. [FlashAttention 원문](https://arxiv.org/pdf/2205.14135v1#page=7)
 
 | BERT-large 학습 구현 | 목표 정확도까지 걸린 시간 |
 | --- | ---: |
@@ -88,21 +88,21 @@ u′ = exp(m − m′) × u + Σ exp(sⱼ − m′) × vⱼ
 
 FA4의 출발점은 Blackwell에서 행렬곱 처리량이 더 빨리 증가했다는 관찰이다. 논문은 B200에서 16비트 부동소수점의 한 형식인 BF16 행렬곱 처리량이 H100의 약 두 배가 됐지만, 연산 묶음 하나당 지수 함수 처리량과 공유 메모리 읽기 대역폭은 같은 수준이라고 설명한다. GPU의 행렬 연산 전용 장치인 tensor core만 더 빨라진 셈이다.
 
-따라서 `QKᵀ`와 `PV`만 빨라지면 softmax의 지수 계산과 온칩 공유 메모리 읽기가 상대적으로 도드라진다. HBM 왕복을 줄이고 나니 다른 작업이 전체 시간을 결정한다. 논문의 하드웨어 수치와 단순화한 처리량 분석에서 나온 설명이므로, attention 모양이 달라도 항상 같은 유닛에서 막힌다고 볼 수는 없다. [FA4 v1, 2–5쪽 §2.2·§3.1.1](https://arxiv.org/pdf/2603.05451v1#page=4)
+따라서 `QKᵀ`와 `PV`만 빨라지면 softmax의 지수 계산과 온칩 공유 메모리 읽기가 상대적으로 도드라진다. HBM 왕복을 줄이고 나니 다른 작업이 전체 시간을 결정한다. 논문의 하드웨어 수치와 단순화한 처리량 분석에서 나온 설명이므로, attention 모양이 달라도 항상 같은 유닛에서 막힌다고 볼 수는 없다. [FA4 원문](https://arxiv.org/pdf/2603.05451v1#page=4)
 
 FA4는 Blackwell의 비동기 행렬곱 결과가 저장되는 tensor memory(TMEM)를 활용해, 두 쿼리 타일 중 한쪽이 행렬곱을 하는 동안 다른 쪽이 softmax를 진행하도록 파이프라인을 짠다. 전방에서는 일부 지수 계산을 다항식과 곱셈·덧셈 결합 연산으로 옮기고, 온라인 최대값이 조금 올랐을 때는 매번 출력을 다시 배율 조정하지 않도록 한다. 다항식은 수학적 지수 함수의 근사다. 따라서 2022년 논문의 **정확한 dense attention 알고리즘**이라는 표현을 FA4의 모든 부동소수점 중간값이 엄밀히 같다는 의미로 넓히면 안 된다.
 
-FA4 논문은 400만 난수 입력에서 다항식의 FP32 오차와 BF16 반올림 후 오차를 따로 제시한다. 역방향에서는 TMEM과 두 스레드 묶음(CTA)이 함께 행렬곱하는 방식을 써 공유 메모리 통행량과 쿼리의 기울기 `dQ`를 여러 작업이 안전하게 더하는 비용을 줄인다. [FA4 v1, 6–9쪽 §3.1·표 2](https://arxiv.org/pdf/2603.05451v1#page=8) [11–12쪽 표 3·§3.2.3](https://arxiv.org/pdf/2603.05451v1#page=11)
+FA4 논문은 400만 난수 입력에서 다항식의 FP32 오차와 BF16 반올림 후 오차를 따로 제시한다. 역방향에서는 TMEM과 두 스레드 묶음(CTA)이 함께 행렬곱하는 방식을 써 공유 메모리 통행량과 쿼리의 기울기 `dQ`를 여러 작업이 안전하게 더하는 비용을 줄인다. [FA4 원문](https://arxiv.org/pdf/2603.05451v1#page=8)
 
 [![다항식 차수별 FP32 출력 오차와 BF16 반올림 뒤 오차](/assets/images/research/fa4-table2-polynomial-error.png)](/assets/images/research/fa4-table2-polynomial-error.png)
 
-*Ted Zadouri 외, FlashAttention-4 v1, [PDF 8쪽 표 2](https://arxiv.org/pdf/2603.05451v1#page=8), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
+*Ted Zadouri 외, FlashAttention-4 v1, [FA4 원문 표 2](https://arxiv.org/pdf/2603.05451v1#page=8), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
 
 표의 왼쪽 두 열은 FP32 계산 결과를, 오른쪽 두 열은 그 값을 BF16으로 반올림한 결과를 FP64 기준과 비교한다. 예를 들어 3차 다항식의 최대 상대 오차는 FP32에서 `8.77×10⁻⁵`, BF16 반올림 뒤에는 `3.90×10⁻³`다. 5차로 높이면 FP32 오차는 `1.44×10⁻⁷`까지 줄지만 BF16 오차는 `3.89×10⁻³`로 거의 같다. BF16으로 사용할 값이라면 다항식 차수를 계속 올려도 최종 오차 이득이 작다는 근거다.
 
 [![FA4 역방향의 행렬곱·공유 메모리·지수 계산 예상 사이클](/assets/images/research/fa4-table3-memory-cycles.png)](/assets/images/research/fa4-table3-memory-cycles.png)
 
-*Ted Zadouri 외, FlashAttention-4 v1, [PDF 11쪽 표 3](https://arxiv.org/pdf/2603.05451v1#page=11), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
+*Ted Zadouri 외, FlashAttention-4 v1, [FA4 원문 표 3](https://arxiv.org/pdf/2603.05451v1#page=11), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
 
 이 표는 실제 전체 커널 지연을 잰 표가 아니라, 타일 설정별 자원 처리량으로 계산한 사이클 비교다. 1-CTA에서 행렬곱은 2,560사이클인데 공유 메모리는 3,328사이클이다. 2-CTA 설정에서는 공유 메모리 비용이 2,688사이클로 줄어 행렬곱과 가까워진다. 연산 장치가 빨라도 데이터를 공급하는 쪽이 더 오래 걸리면 그 장치를 기다리게 한다.
 
@@ -110,31 +110,31 @@ FA4 논문은 400만 난수 입력에서 다항식의 FP32 오차와 BF16 반올
 
 [![FA4 원문 그림 4: B200에서 시퀀스 길이별 전방 attention 처리량](/assets/images/research/fa4-figure4.png)](/assets/images/research/fa4-figure4.png)
 
-*Ted Zadouri 외, FlashAttention-4 v1, [PDF 15쪽 그림 4](https://arxiv.org/pdf/2603.05451v1#page=15), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). 그래프 영역만 잘랐으며 그래프 내용은 바꾸지 않았다. 이미지를 누르면 크게 볼 수 있다.*
+*Ted Zadouri 외, FlashAttention-4 v1, [FA4 원문 그림 4](https://arxiv.org/pdf/2603.05451v1#page=15), [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). 그래프 영역만 잘랐으며 그래프 내용은 바꾸지 않았다. 이미지를 누르면 크게 볼 수 있다.*
 
 가로축은 시퀀스 길이, 세로축은 초당 부동소수점 연산량이다. 왼쪽은 비인과 attention, 오른쪽은 인과 attention이며 두 그래프 모두 head 차원 128이다. 한 길이의 가장 높은 막대를 전체 모델의 가속 비율로 읽으면 안 된다.
 
-이것은 모델 전체 학습 시간의 배율이 아니다. 같은 그림의 캡션은 후속 cuDNN 버전이 일부 기법을 받아들여 비슷한 성능에 이르렀다고 덧붙인다. [15쪽 §5·그림 4](https://arxiv.org/pdf/2603.05451v1#page=15)
+이것은 모델 전체 학습 시간의 배율이 아니다. 같은 그림의 캡션은 후속 cuDNN 버전이 일부 기법을 받아들여 비슷한 성능에 이르렀다고 덧붙인다. [FA4 원문](https://arxiv.org/pdf/2603.05451v1#page=15)
 
 ## FP4는 왜 행렬곱만 바꿔서는 끝나지 않나
 
 Robert Hu의 9월 보고서는 먼저 **추론용 전방**과 **학습용 인과 attention**을 분리한다. 전방의 `full FP4`는 attention 안의 `Q,K,P,V` 네 피연산자가 FP4라는 뜻이다. 모델의 선형 변환(projection), 정규화, 손실 계산까지 전부 FP4라는 뜻이 아니다.
 
-특히 `P`는 입력에서 읽는 피연산자가 아니라 `QKᵀ` 점수를 softmax로 바꿔 **커널 안에서 새로 만들어야 하는 피연산자**다. FP4 행렬곱 자체가 짧아질수록 점수의 최대값 계산, 확률 표현, 스케일 기록, 다음 `PV`가 읽을 수 있다는 신호를 보내는 일이 지연을 결정한다. [FP4 보고서 v1, 1–2쪽 §1](https://arxiv.org/pdf/2609.04105v1#page=2) [5쪽 §3.1](https://arxiv.org/pdf/2609.04105v1#page=6)
+특히 `P`는 입력에서 읽는 피연산자가 아니라 `QKᵀ` 점수를 softmax로 바꿔 **커널 안에서 새로 만들어야 하는 피연산자**다. FP4 행렬곱 자체가 짧아질수록 점수의 최대값 계산, 확률 표현, 스케일 기록, 다음 `PV`가 읽을 수 있다는 신호를 보내는 일이 지연을 결정한다. [FP4 후속 연구](https://arxiv.org/pdf/2609.04105v1#page=2)
 
 제안한 Direct-P는 이 중 점수에서 FP4 확률 `P`를 만드는 구간을 줄인다. 점수를 먼저 높은 정밀도의 지수값으로 만든 다음 4비트 코드로 버리는 대신, 점수에서 지수 2비트·가수 1비트를 쓰는 E2M1 표현의 반올림 구간을 바로 고른다. 여기서 NVFP4와 MXFP4는 여러 값이 스케일을 공유하는 서로 다른 4비트 표현 방식이다. `Q,K`에는 NVFP4, `P,V`에는 32개 값이 2의 거듭제곱 스케일을 공유하는 MXFP4를 쓴다. 이 선택은 표현 범위와 코드 생성 비용의 절충이다.
 
 값이 0으로 양자화되거나 코드 경계가 달라질 수 있으므로 **2022년의 정확한 attention과는 다른 근사 연산**이다.
 
-분자 `PV`를 계산할 때 쓴 반올림 확률과 분모를 계산할 때 쓴 확률이 다르면 그 차이 때문에 출력 오차가 더 생긴다. Direct-P는 분모도 같은 코드와 스케일에서 합산해 이 불일치를 피한다. [FP4 보고서 v1, 6–10쪽 표 2–4·§4.2–4.3](https://arxiv.org/pdf/2609.04105v1#page=8)
+분자 `PV`를 계산할 때 쓴 반올림 확률과 분모를 계산할 때 쓴 확률이 다르면 그 차이 때문에 출력 오차가 더 생긴다. Direct-P는 분모도 같은 코드와 스케일에서 합산해 이 불일치를 피한다. [FP4 후속 연구](https://arxiv.org/pdf/2609.04105v1#page=8)
 
 논문의 GB200 비인과 전방 실험에서는 시퀀스 길이 8192, head 64개, 차원 128인 모양에서 Direct-P fast 커널이 BF16 기준 1.611488 ms에서 0.758336 ms로 줄어 **2.125배** 빠르다. 본문과 초록의 최대 2.13배는 이 값을 반올림한 것이다. 같은 보고서의 GB200 D128 아홉 모양에서 fast의 기하평균 속도 배율은 2.023배다.
 
-다만 입력 `Q/K/V`를 미리 양자화하는 시간과 선택적인 키·값 재배열은 커널 측정에 들어 있지 않다. 이 숫자를 전체 추론 지연으로 읽을 수 없다. [FP4 보고서 v1, 11–14쪽 §5.2–6.2·표 7](https://arxiv.org/pdf/2609.04105v1#page=13) [15쪽 그림 4](https://arxiv.org/pdf/2609.04105v1#page=16)
+다만 입력 `Q/K/V`를 미리 양자화하는 시간과 선택적인 키·값 재배열은 커널 측정에 들어 있지 않다. 이 숫자를 전체 추론 지연으로 읽을 수 없다. [FP4 후속 연구](https://arxiv.org/pdf/2609.04105v1#page=13)
 
 [![입력 모양과 GPU별 Direct-P 전방 커널 시간·처리량·오차](/assets/images/research/fp4-table7-forward.png)](/assets/images/research/fp4-table7-forward.png)
 
-*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [PDF 14쪽 표 7](https://arxiv.org/pdf/2609.04105v1#page=14), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
+*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [FP4 후속 연구 표 7](https://arxiv.org/pdf/2609.04105v1#page=14), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
 
 `D/H/S`는 head 차원·head 수·시퀀스 길이다. `D128/H64/S8192` 행에서 GB200 시간 `0.758336 ms`를 찾을 수 있다. 오른쪽은 B300의 시간·오차와 다른 연구의 GB300 보고값을 나란히 둔 열이므로, 하드웨어를 섞어 GB200에서의 2.125배를 재계산해서는 안 된다.
 
@@ -152,23 +152,23 @@ Robert Hu의 9월 보고서는 먼저 **추론용 전방**과 **학습용 인과
 
 [![FP4 attention을 사용한 ViT와 BERT의 고정 입력 과제 정확도와 출력 오차](/assets/images/research/fp4-table8-task-quality.png)](/assets/images/research/fp4-table8-task-quality.png)
 
-*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [PDF 17쪽 표 8](https://arxiv.org/pdf/2609.04105v1#page=17), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
+*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [FP4 후속 연구 표 8](https://arxiv.org/pdf/2609.04105v1#page=17), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
 
 `Task score / BF16` 열은 낮은 정밀도 경로와 BF16 경로의 과제 점수다. ViT S4096의 fast 행은 `88.50 / 88.50`으로 같지만, 오른쪽 출력 오차는 0이 아니다. 이 표의 `Speedup`은 모델 전체가 아니라 해당 attention 모양의 커널 속도다.
 
 [![Wan 비디오 모델에서 1·4·20단계 뒤 FP4와 BF16 출력 차이](/assets/images/research/fp4-table9-video-quality.png)](/assets/images/research/fp4-table9-video-quality.png)
 
-*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [PDF 17쪽 표 9](https://arxiv.org/pdf/2609.04105v1#page=17), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
+*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [FP4 후속 연구 표 9](https://arxiv.org/pdf/2609.04105v1#page=17), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
 
 열의 `1 step`, `4 steps`, `20 steps`를 따라가면 같은 근사가 반복될 때의 차이를 볼 수 있다. Wan2.1-14B의 fast 행은 BF16 대비 cosine이 `0.9938 → 0.9338 → 0.8496`, relative-L2가 `0.1179 → 0.3589 → 0.5337`로 변한다. 단일 연산의 작은 차이가 여러 단계 뒤에도 작다고 가정할 수 없는 사례다. 영상의 사람이 느끼는 품질을 이 두 지표만으로 판정한 결과는 아니다.
 
-고정 입력에서 한 과제의 정확도가 같았다는 사실은 일반적인 FP4 추론 안전성이나 긴 생성 품질을 증명하지 않는다. [FP4 보고서 v1, 13–18쪽 §6.1–6.4·표 8–9](https://arxiv.org/pdf/2609.04105v1#page=14)
+고정 입력에서 한 과제의 정확도가 같았다는 사실은 일반적인 FP4 추론 안전성이나 긴 생성 품질을 증명하지 않는다. [FP4 후속 연구](https://arxiv.org/pdf/2609.04105v1#page=14)
 
 ## 학습에서는 FP4 확률을 그대로 밀어붙이지 않았다
 
 역전파는 전방에서 만든 정보를 다시 써야 한다. 9월 보고서의 인과 학습 경로는 양자화된 `Q/K`, 스케일, 각 행의 지수 합에 로그를 취한 값(log-sum-exp)을 저장한 뒤 역방향에서 확률을 재구성한다.
 
-하지만 안정적으로 유지한 학습 경로의 `P,V`와 여러 기울기 피연산자는 **FP8**이다. 학습된 QKV·출력 projection의 정밀도도 별도 변수다. 저자들이 `exact`라고 부르는 역방향 재구성은 양자화된 전방 피연산자에 대한 정확성이지 원래 BF16 입력에 대한 무손실 복원이 아니다. [FP4 보고서 v1, 19–22쪽 §7.1–7.3·표 11](https://arxiv.org/pdf/2609.04105v1#page=20)
+하지만 안정적으로 유지한 학습 경로의 `P,V`와 여러 기울기 피연산자는 **FP8**이다. 학습된 QKV·출력 projection의 정밀도도 별도 변수다. 저자들이 `exact`라고 부르는 역방향 재구성은 양자화된 전방 피연산자에 대한 정확성이지 원래 BF16 입력에 대한 무손실 복원이 아니다. [FP4 후속 연구](https://arxiv.org/pdf/2609.04105v1#page=20)
 
 원문 표 11의 정밀도 계약에서 이 구분에 필요한 항목을 추리면 다음과 같다.
 
@@ -191,11 +191,11 @@ Robert Hu의 9월 보고서는 먼저 **추론용 전방**과 **학습용 인과
 | 선형 변환·회전 위치 부호화(RoPE)·전방·역방향을 포함한 attention 하위층 | 2.656 → 2.133 ms, 1.245배 | attention 주변 연산까지 포함 |
 | 8B 모델의 단일 GPU 전체 업데이트, FP8 `P/V` 경로 | 854.516 → 751.722 ms, 1.137배 | 아래에 적은 합성 토큰·배치 조건의 전체 업데이트 |
 
-마지막 행은 매개변수 80억 개의 모델(8B), 길이 4096, 로컬 배치 4에서 얻은 값이다. 합성 토큰으로 짧게 실행한 성능 실험이므로 학습 품질 결과로 읽을 수 없다. 커널의 1.405배를 전체 학습 속도에 그대로 적용해서도 안 된다. [FP4 보고서 v1, 21쪽 표 12](https://arxiv.org/pdf/2609.04105v1#page=22) [22쪽 표 13](https://arxiv.org/pdf/2609.04105v1#page=23) [23–24쪽 표 14](https://arxiv.org/pdf/2609.04105v1#page=25)
+마지막 행은 매개변수 80억 개의 모델(8B), 길이 4096, 로컬 배치 4에서 얻은 값이다. 합성 토큰으로 짧게 실행한 성능 실험이므로 학습 품질 결과로 읽을 수 없다. 커널의 1.405배를 전체 학습 속도에 그대로 적용해서도 안 된다. [FP4 후속 연구](https://arxiv.org/pdf/2609.04105v1#page=22)
 
 [![배치별 FP8 및 MXFP4 확률 경로의 전체 모델 업데이트 시간](/assets/images/research/fp4-table14-full-update.png)](/assets/images/research/fp4-table14-full-update.png)
 
-*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [PDF 25쪽 표 14](https://arxiv.org/pdf/2609.04105v1#page=25), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
+*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [FP4 후속 연구 표 14](https://arxiv.org/pdf/2609.04105v1#page=25), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
 
 왼쪽 묶음은 FP8 `P/V`, 오른쪽 묶음은 MXFP4 `P/V`이고 각자 인접한 BF16 기준이 있다. B4의 FP8은 `854.516 → 751.722 ms`, MXFP4는 `857.226 → 751.597 ms`다. 속도는 비슷해도 아래의 긴 학습 결과까지 같지는 않았다. `B1/B2/B4`는 로컬 배치 크기이며 표의 시간 단위는 ms다.
 
@@ -209,33 +209,33 @@ Robert Hu의 9월 보고서는 먼저 **추론용 전방**과 **학습용 인과
 
 [![동일 토큰 진행 지점의 BF16 및 FP8 경로 학습·검증 손실](/assets/images/research/fp4-figure10-training-quality.png)](/assets/images/research/fp4-figure10-training-quality.png)
 
-*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [PDF 27쪽 그림 10](https://arxiv.org/pdf/2609.04105v1#page=27), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
+*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [FP4 후속 연구 그림 10](https://arxiv.org/pdf/2609.04105v1#page=27), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
 
 가로축은 처리한 토큰 수이고, 회색은 BF16 기준, 파란색은 NVFP4 선형 변환과 FP8 `P/V`를 쓰는 경로다. 위의 전체 학습 손실에서는 곡선이 가까워 보이지만, 아래 확대된 검증 손실에서는 파란 곡선이 더 높다. 마지막 공통 검증값 `2.3948 − 2.3048 = 0.0900`의 차이를 아래 패널에서 확인할 수 있다. 각 경로가 한 번의 학습 궤적이라는 조건도 함께 읽어야 한다.
 
 [![같은 토큰 지점에서 비교한 분산 학습의 GPU당 처리량](/assets/images/research/fp4-figure11-training-throughput.png)](/assets/images/research/fp4-figure11-training-throughput.png)
 
-*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [PDF 28쪽 그림 11](https://arxiv.org/pdf/2609.04105v1#page=28), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
+*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [FP4 후속 연구 그림 11](https://arxiv.org/pdf/2609.04105v1#page=28), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
 
 처리량 그림의 세로축은 GPU당 초당 토큰 수이며 천 단위다. 점선은 각 경로의 중앙값으로 약 21.85k와 24.30k다. 입력 대기와 체크포인트 시점의 낮은 관측값도 남겨 두었다. 이 그림은 처리량의 개선을 뒷받침하지만, 바로 위 검증 손실 그림의 차이를 없애지는 않는다.
 
-저자들은 MXFP4 실패를 한 명령어의 단독 원인으로 확정하지 않았고, projection 정밀도도 동시에 달라진 경로에서 검증 손실 격차를 attention 하나의 탓으로 돌리지 않았다. [FP4 보고서 v1, 24–28쪽 §7.6–7.7·그림 10–11](https://arxiv.org/pdf/2609.04105v1#page=25) [부록 G.8, 49–51쪽](https://arxiv.org/pdf/2609.04105v1#page=49)
+저자들은 MXFP4 실패를 한 명령어의 단독 원인으로 확정하지 않았고, projection 정밀도도 동시에 달라진 경로에서 검증 손실 격차를 attention 하나의 탓으로 돌리지 않았다. [FP4 후속 연구](https://arxiv.org/pdf/2609.04105v1#page=25)
 
 ## 다음 최적화 대상을 고르는 법
 
 세 연구는 줄이려는 비용부터 다르다. ‘버전별 최고 속도’만 나란히 놓으면 그 차이를 놓친다. 2022년의 병목은 거대한 중간 행렬의 HBM 왕복이었다. FA4가 보는 Blackwell의 병목은 온칩 공유 메모리와 지수 계산, 그 작업을 행렬곱과 겹치는 일정이다. FP4 후속 보고서는 더 빠른 행렬곱 뒤에 남는 **확률 피연산자의 준비와 TMEM 소유권**까지 추적한다.
 
-실제로 저자들이 마지막 Direct-P 커널에서 거의 모든 확률 생성 작업을 빼 본 *정답을 계산하지 않는 진단*은 실행 시간을 5.23%만 줄였다. 남은 시간을 다항식 하나로 없앨 수 없다는 근거이고, 추가 점수 버퍼나 다른 `PV` 발행 단위는 아직 측정된 개선이 아니라 제안이다. [FlashAttention v1, 6쪽 그림 2](https://arxiv.org/pdf/2205.14135v1#page=6) [FA4 v1, 10–12쪽 표 3](https://arxiv.org/pdf/2603.05451v1#page=11) [FP4 보고서 v1, 28–30쪽 표 15–17·§8.4–8.5](https://arxiv.org/pdf/2609.04105v1#page=29)
+실제로 저자들이 마지막 Direct-P 커널에서 거의 모든 확률 생성 작업을 빼 본 *정답을 계산하지 않는 진단*은 실행 시간을 5.23%만 줄였다. 남은 시간을 다항식 하나로 없앨 수 없다는 근거이고, 추가 점수 버퍼나 다른 `PV` 발행 단위는 아직 측정된 개선이 아니라 제안이다. [FlashAttention 원문](https://arxiv.org/pdf/2205.14135v1#page=6) · [FA4 원문](https://arxiv.org/pdf/2603.05451v1#page=11) · [FP4 후속 연구](https://arxiv.org/pdf/2609.04105v1#page=29)
 
 [![정답을 계산하지 않는 진단으로 남은 가속 여지를 비교한 표](/assets/images/research/fp4-table17-diagnostic-ceiling.png)](/assets/images/research/fp4-table17-diagnostic-ceiling.png)
 
-*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [PDF 30쪽 표 17](https://arxiv.org/pdf/2609.04105v1#page=30), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
+*Robert Hu, Hardware-Aware FP4 FlashAttention-4 v1, [FP4 후속 연구 표 17](https://arxiv.org/pdf/2609.04105v1#page=30), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 표·그림 영역만 잘랐으며 내용은 바꾸지 않았다. 누르면 확대할 수 있다.*
 
 유효한 기준 실행은 `0.092448 ms`다. 확률을 고정값으로 대체한 마지막 행은 `0.087616 ms`로 4.832 μs, 5.23%만 줄어든다. 이 행은 attention 정답을 계산하는 구현이 아니므로 새로운 성능 기록으로 채택할 수 없다. 확률 계산을 더 싸게 만드는 것만으로 남은 실행 시간 전체를 없애기 어렵다는 진단이다.
 
 자신의 모델에 적용하려면 **어디까지 실행 시간을 재고 어떤 오차를 비교할지**부터 정해 보자. 같은 `N`, head 차원, 마스크, GPU에서 attention 커널을 재는가, 양자화와 projection까지 포함하는가, optimizer와 통신이 들어간 전체 업데이트인가? 전방 출력의 cosine뿐 아니라 크기 오차와 실제 과제 결과를 보았는가?
 
-학습이면 한 번의 빠른 업데이트를 넘어 같은 토큰 지점의 검증 손실과 여러 궤적을 확인했는가? 측정 경계가 달라지는 순간, 앞 문장의 ‘2배’는 다음 문장의 ‘2배’가 아니다. [FP4 보고서 v1, 10쪽 표 6](https://arxiv.org/pdf/2609.04105v1#page=11) [30–31쪽 §8.5](https://arxiv.org/pdf/2609.04105v1#page=31)
+학습이면 한 번의 빠른 업데이트를 넘어 같은 토큰 지점의 검증 손실과 여러 궤적을 확인했는가? 측정 경계가 달라지는 순간, 앞 문장의 ‘2배’는 다음 문장의 ‘2배’가 아니다. [FP4 후속 연구](https://arxiv.org/pdf/2609.04105v1#page=11)
 
 ## 참고 논문
 

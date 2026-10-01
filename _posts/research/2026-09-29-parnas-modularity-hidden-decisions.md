@@ -33,11 +33,11 @@ red blue green
 
 첫 분해는 처리 순서를 따른다. 입력 모듈이 메모리에 문자를 저장하고, 회전 모듈이 원본 줄과 시작 위치를 가리키는 목록을 만든다. 정렬 모듈은 그 목록을 재배열하고, 출력 모듈이 원본 저장소를 다시 읽는다.
 
-각 단계가 공유 메모리의 레이아웃과 포인터 규칙을 알아야 한다. 실행 흐름 자체는 이해하기 쉽다. 변경이 퍼지는 원인은 각 단계가 같은 저장 표현에 의존한다는 데 있다. [원문 1054쪽, PDF 2쪽](https://www.cs.colostate.edu/~france/CS314/Readings/Parnas-decomposition.pdf#page=2)
+각 단계가 공유 메모리의 레이아웃과 포인터 규칙을 알아야 한다. 실행 흐름 자체는 이해하기 쉽다. 변경이 퍼지는 원인은 각 단계가 같은 저장 표현에 의존한다는 데 있다. [Parnas의 모듈화 논문](https://www.cs.colostate.edu/~france/CS314/Readings/Parnas-decomposition.pdf#page=2)
 
 두 번째 분해는 저장 결정의 주인을 따로 둔다. 줄 저장 모듈은 문자를 실제로 어떻게 배치하는지 숨긴다. 회전 모듈은 회전 결과를 미리 만들어 두었는지, 원본 위치만 기록했는지, 요청 시 계산하는지 숨긴다. 정렬 모듈은 정렬을 언제 수행하는지 숨긴다.
 
-다른 모듈은 필요한 값을 요청하고 정해진 의미의 결과를 받는다. [원문 1054–1055쪽](https://www.cs.colostate.edu/~france/CS314/Readings/Parnas-decomposition.pdf#page=2)
+다른 모듈은 필요한 값을 요청하고 정해진 의미의 결과를 받는다. [Parnas의 모듈화 논문](https://www.cs.colostate.edu/~france/CS314/Readings/Parnas-decomposition.pdf#page=2)
 
 | 변경할 결정 | 공유 표현을 직접 읽는 경우 | 그 결정을 감춘 경우 |
 |---|---|---|
@@ -51,7 +51,7 @@ red blue green
 
 논문에서 모듈은 책임을 배정하는 단위다. 반드시 함수 하나, 클래스 하나, 실행 단계 하나에 대응하지 않는다. 같은 알고리즘과 같은 메모리 배치를 사용해도, 개발자가 무엇을 알아야 코드를 고칠 수 있는지에 따라 분해는 달라진다.
 
-Parnas는 두 방식으로 만든 프로그램이 최종 실행 표현에서는 같을 수도 있다고 설명한다. 차이는 수정·문서화·이해에 쓰는 표현에 남는다. [원문 1054–1055쪽](https://www.cs.colostate.edu/~france/CS314/Readings/Parnas-decomposition.pdf#page=2)
+Parnas는 두 방식으로 만든 프로그램이 최종 실행 표현에서는 같을 수도 있다고 설명한다. 차이는 수정·문서화·이해에 쓰는 표현에 남는다. [Parnas의 모듈화 논문](https://www.cs.colostate.edu/~france/CS314/Readings/Parnas-decomposition.pdf#page=2)
 
 현대 코드에서도 `private` 키워드만으로는 이 효과가 생기지 않는다. 내부 배열을 숨겨 놓고 반환값으로 배열의 가변 참조를 그대로 넘긴다면 호출자가 그 표현에 의존할 여지가 남는다.
 
@@ -133,7 +133,7 @@ red blue green
 
 ## 좋은 경계도 불필요한 약속 하나로 좁아진다
 
-논문에서 특히 읽을 만한 부분은 두 번째 분해의 결함을 저자가 스스로 지적하는 대목이다. 회전 모듈이 결과 생성 방식을 숨겼지만, 회전 결과의 열거 순서는 고정했다. 이 약속 때문에 처음부터 사전순으로 회전을 만들어 정렬 일을 없애는 구현을 선택하기 어려워졌다. [원문 1056쪽, Improvement in Circular Shift Module](https://www.cs.colostate.edu/~france/CS314/Readings/Parnas-decomposition.pdf#page=4)
+논문에서 특히 읽을 만한 부분은 두 번째 분해의 결함을 저자가 스스로 지적하는 대목이다. 회전 모듈이 결과 생성 방식을 숨겼지만, 회전 결과의 열거 순서는 고정했다. 이 약속 때문에 처음부터 사전순으로 회전을 만들어 정렬 일을 없애는 구현을 선택하기 어려워졌다. [Parnas의 모듈화 논문](https://www.cs.colostate.edu/~france/CS314/Readings/Parnas-decomposition.pdf#page=4)
 
 값의 의미와 무관한 순서를 외부 계약으로 만든 순간 내부 선택권이 줄어든다. 앞의 예제에서 번호별 문자열 대신 최종 정렬 결과를 비교한 이유도 여기에 있다. 테스트가 내부 순서를 그대로 기대하면 테스트 자체가 필요 없는 계약을 굳힐 수 있다.
 
@@ -141,11 +141,11 @@ red blue green
 
 ## 추상화의 비용도 경계 안에 넣는다
 
-Parnas는 두 번째 분해가 무조건 빠르다고 주장하지 않는다. 문자 하나를 읽을 때마다 복잡한 함수 호출이 발생하면 첫 방식보다 느려질 수 있다고 따로 논의한다. 당시에는 호출처럼 작성하되 다른 형태로 코드를 조립하는 도구를 제안했다. 오늘의 인라이닝이나 일괄 처리와 연결해 생각할 수 있지만, 그 도구가 비용을 모두 없앤다는 결론은 원문에서 나오지 않는다. [원문 1057쪽, Efficiency and Implementation](https://www.cs.colostate.edu/~france/CS314/Readings/Parnas-decomposition.pdf#page=5)
+Parnas는 두 번째 분해가 무조건 빠르다고 주장하지 않는다. 문자 하나를 읽을 때마다 복잡한 함수 호출이 발생하면 첫 방식보다 느려질 수 있다고 따로 논의한다. 당시에는 호출처럼 작성하되 다른 형태로 코드를 조립하는 도구를 제안했다. 오늘의 인라이닝이나 일괄 처리와 연결해 생각할 수 있지만, 그 도구가 비용을 모두 없앤다는 결론은 원문에서 나오지 않는다. [Parnas의 모듈화 논문](https://www.cs.colostate.edu/~france/CS314/Readings/Parnas-decomposition.pdf#page=5)
 
 가령 저장소를 원격 서비스로 바꾼 뒤 `text()`를 항목마다 네트워크 호출로 구현하면 표현은 숨겨도 지연 비용은 커진다. 호출자의 기능 계약이 같다는 것과 운영 특성이 같다는 것은 별개다. 요구된 지연을 만족하려고 묶음 읽기를 추가하면 그때는 계약 변경을 함께 검토해야 한다. 미래의 모든 저장소를 대비해 처음부터 인터페이스를 키우기보다, 실제 바꾸려는 결정과 그 비용을 기준으로 경계를 잡을 수 있다.
 
-계층 구조도 별개다. 의존 방향이 위에서 아래로 정돈되어 있어도 각 계층이 같은 내부 데이터 형식을 안다면 변경은 여전히 퍼진다. 원문은 의존 계층과 좋은 분해를 서로 독립적인 속성으로 구분한다. [원문 1057–1058쪽](https://www.cs.colostate.edu/~france/CS314/Readings/Parnas-decomposition.pdf#page=5)
+계층 구조도 별개다. 의존 방향이 위에서 아래로 정돈되어 있어도 각 계층이 같은 내부 데이터 형식을 안다면 변경은 여전히 퍼진다. 원문은 의존 계층과 좋은 분해를 서로 독립적인 속성으로 구분한다. [Parnas의 모듈화 논문](https://www.cs.colostate.edu/~france/CS314/Readings/Parnas-decomposition.pdf#page=5)
 
 ## 내 코드에서는 한 가지 변경으로 시험한다
 

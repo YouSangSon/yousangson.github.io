@@ -28,7 +28,7 @@ date: 2026-09-29
 
 [![단일 응답 평가와 도구·환경을 오가는 에이전트 실행 루프를 비교한 원문 슬라이드](/assets/images/research/awesome-agent-evaluation-page3.png)](/assets/images/research/awesome-agent-evaluation-page3.png)
 
-*원문 캡처: Eric-LLMs, Agent Evaluation Engineering, 3쪽. [고정 판본 PDF](https://github.com/Eric-LLMs/awesome-ai-engineering/blob/cc834a89c2d052529bca4318dfdc69f8bfd1ce4e/summaries/agent-evaluation/agent-evaluation-engineering.pdf), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). PDF 한 쪽을 내용 변경 없이 PNG로 변환했다. 이미지를 누르면 크게 볼 수 있다.*
+*원문 캡처: Eric-LLMs, Agent Evaluation Engineering. [고정 판본 PDF](https://github.com/Eric-LLMs/awesome-ai-engineering/blob/cc834a89c2d052529bca4318dfdc69f8bfd1ce4e/summaries/agent-evaluation/agent-evaluation-engineering.pdf#page=3), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). PDF 한 쪽을 내용 변경 없이 PNG로 변환했다. 이미지를 누르면 크게 볼 수 있다.*
 
 왼쪽은 응답 뒤에 평가자를 붙인 흐름이고, 오른쪽은 도구를 사용해 바뀐 환경을 다시 관찰하는 루프다. 오른쪽 흐름에서는 마지막 문장만 읽으면 도구가 만든 효과를 놓친다. 그림의 ‘reasoning’ 표기를 모델의 숨은 사고 과정 전체에 접근할 수 있다는 뜻으로 읽지는 않는다.
 
@@ -54,7 +54,7 @@ date: 2026-09-29
 
 [![응답 중 세션 상태를 읽고 쓰는 경로와 응답 밖에서 사실·선호·요약을 추출하는 비동기 경로를 나눈 메모리 처리 그림](/assets/images/research/awesome-memory-hot-path-page6.png)](/assets/images/research/awesome-memory-hot-path-page6.png)
 
-*Eric-LLMs, Building Memory for Agentic AI: Theory, Frameworks, and Practice, 6쪽. [고정 판본 PDF](https://github.com/Eric-LLMs/awesome-ai-engineering/blob/cc834a89c2d052529bca4318dfdc69f8bfd1ce4e/summaries/building-memory-for-agentic-ai-theory-frameworks-and-practice/building-memory-for-agentic-ai-theory-frameworks-and-practice.pdf), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 한 쪽을 내용 변경 없이 PNG로 변환했다. 누르면 확대할 수 있다.*
+*Eric-LLMs, Building Memory for Agentic AI: Theory, Frameworks, and Practice. [고정 판본 PDF](https://github.com/Eric-LLMs/awesome-ai-engineering/blob/cc834a89c2d052529bca4318dfdc69f8bfd1ce4e/summaries/building-memory-for-agentic-ai-theory-frameworks-and-practice/building-memory-for-agentic-ai-theory-frameworks-and-practice.pdf#page=6), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). 한 쪽을 내용 변경 없이 PNG로 변환했다. 누르면 확대할 수 있다.*
 
 추출과 색인 작업을 응답 밖으로 옮기면 사용자가 그 작업을 기다리지 않아도 된다. 다만 그림에는 “다음 요청이 반드시 갱신된 기억을 읽는다”는 보장이 없다. 이를 만들려면 어디에 저장한 값을 현재 사실로 인정할지 정해야 한다.
 
@@ -89,7 +89,7 @@ date: 2026-09-29
 
 삭제도 같은 문제를 가진다. 원본을 지운 뒤 그 내용을 포함한 요약과 검색 색인이 남아 있으면, 다음 답변에는 삭제한 정보가 다시 나타난다. 처리 중이던 추출 작업이 삭제 후에 완료되어 색인을 다시 만드는 경우도 있다.
 
-이를 막는 한 방법은 원본 식별자에 삭제 상태와 버전을 먼저 남기고, 조회와 비동기 쓰기에서 그 상태를 확인하는 것이다. 이후 원본·요약·색인·캐시의 복사본을 지운다. 외부 색인의 쓰기와 삭제 상태 확인을 하나로 묶을 수 없다면, 이미 실행 중인 옛 작업의 종료를 확인한 뒤 삭제를 다시 수행해야 한다. 그동안 조회에서는 삭제 상태를 계속 적용한다. 이 순서는 살아 있는 서비스에서 정보가 다시 노출되는 경로를 줄이지만, 백업까지 제거되었다는 증명은 아니다. 백업의 보관·삭제 절차는 별도로 맞춰야 한다. 메모리 자료의 갱신·망각 논의도 이렇게 읽으면 단순한 “벡터 삭제”가 실제 서비스의 어느 부분을 해결하는지 구별할 수 있다. [메모리 자료 14쪽](https://github.com/Eric-LLMs/awesome-ai-engineering/blob/cc834a89c2d052529bca4318dfdc69f8bfd1ce4e/summaries/building-memory-for-agentic-ai-theory-frameworks-and-practice/building-memory-for-agentic-ai-theory-frameworks-and-practice.pdf)
+이를 막는 한 방법은 원본 식별자에 삭제 상태와 버전을 먼저 남기고, 조회와 비동기 쓰기에서 그 상태를 확인하는 것이다. 이후 원본·요약·색인·캐시의 복사본을 지운다. 외부 색인의 쓰기와 삭제 상태 확인을 하나로 묶을 수 없다면, 이미 실행 중인 옛 작업의 종료를 확인한 뒤 삭제를 다시 수행해야 한다. 그동안 조회에서는 삭제 상태를 계속 적용한다. 이 순서는 살아 있는 서비스에서 정보가 다시 노출되는 경로를 줄이지만, 백업까지 제거되었다는 증명은 아니다. 백업의 보관·삭제 절차는 별도로 맞춰야 한다. 메모리 자료의 갱신·망각 논의도 이렇게 읽으면 단순한 “벡터 삭제”가 실제 서비스의 어느 부분을 해결하는지 구별할 수 있다. [기억 갱신·삭제 자료](https://github.com/Eric-LLMs/awesome-ai-engineering/blob/cc834a89c2d052529bca4318dfdc69f8bfd1ce4e/summaries/building-memory-for-agentic-ai-theory-frameworks-and-practice/building-memory-for-agentic-ai-theory-frameworks-and-practice.pdf)
 
 이 설계에서 기억 저장소를 바꾸더라도 남는 질문은 같다. **무엇을 현재 사실로 인정하고, 어느 시점부터 읽게 하며, 언제 더는 쓰지 못하게 할 것인가.** 용량과 검색 속도는 이 동작을 정한 다음 비교할 수 있다.
 
