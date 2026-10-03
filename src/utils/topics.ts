@@ -52,6 +52,7 @@ export const topics = [
       'distributed-lock-ttl-auto-renewal',
       'redis-lock-queue-race-condition-fix',
       'kafka-poison-partition-and-commit-frontier',
+      'timeout-unknown-outcome-and-idempotency',
     ],
   },
   {

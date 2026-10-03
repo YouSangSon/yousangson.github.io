@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>커밋과 응답 사이의 간격</title>
+  <style>
+    :root{color-scheme:light dark;--paper:oklch(97% .018 85);--ink:oklch(27% .025 55);--muted:oklch(46% .025 55);--rule:oklch(46% .025 55 / .28);--accent:#93452d;--tint:rgba(147,69,45,.07);--sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic","Segoe UI",sans-serif}
+    *{box-sizing:border-box}body{margin:0;padding:16px;color:var(--ink);background:var(--paper);font:16px/1.6 var(--sans)}h1{font-family:Georgia,"Times New Roman","Apple SD Gothic Neo","Noto Sans KR",serif;font-size:22px;line-height:1.35;margin:0 0 8px}h2{font-size:19px;margin:20px 0 8px}p{margin:8px 0}button{font:inherit;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);padding:8px 12px;cursor:pointer}button:focus-visible,.diagram-container:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.diagram-container{max-width:100%;overflow-x:auto;border:1px solid var(--rule);border-radius:6px}svg{display:block;width:100%;min-width:960px;font-family:var(--sans);font-size:16px}text{fill:var(--ink)}.node,.mask{fill:var(--paper)}.node{stroke:var(--rule)}.name{font-weight:600}.life{stroke:var(--rule);stroke-dasharray:4,4}.edge{stroke:var(--muted);stroke-width:1.5}.focal{fill:var(--tint);stroke:var(--accent)}.muted{color:var(--muted)}.controls{display:none;flex-wrap:wrap;gap:8px;margin:12px 0}.js .controls{display:flex}.result{border-left:3px solid var(--accent);padding:12px 16px;background:var(--tint);min-height:110px}.result strong{font-size:22px}code{font-family:ui-monospace,monospace;font-size:.95em}noscript p{border:1px solid var(--rule);padding:12px}
+    @media(prefers-color-scheme:dark){:root{--paper:oklch(20% .012 55);--ink:oklch(93% .015 80);--muted:oklch(78% .018 75);--rule:oklch(78% .018 75 / .28);--accent:#e5a387;--tint:rgba(229,163,135,.08)}}
+    @media print{.controls{display:none!important}.diagram-container{overflow:visible}svg{min-width:0;max-width:100%}}
+  </style>
+</head>
+<body>
+  <h1>커밋과 응답 사이의 간격</h1>
+  <p>위에서 아래로 시간이 흐릅니다. 좁은 화면에서는 그림만 좌우로 움직여 볼 수 있습니다.</p>
+  <div class="diagram-container" tabindex="0" role="region" aria-label="커밋 뒤 응답을 받지 못한 요청의 순서">
+    <svg viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="response-loss-title response-loss-desc">
+      <title id="response-loss-title">서버의 완료와 클라이언트의 결과 불명</title>
+      <desc id="response-loss-desc">서버가 카운터와 영수증을 함께 커밋한 뒤 응답을 보내지 않으면 저장소에는 완료가 남고 클라이언트는 결과를 알 수 없다.</desc>
+      <defs><marker id="response-loss-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="var(--muted)"/></marker></defs>
+      <line class="life" x1="128" y1="96" x2="128" y2="380"/>
+      <line class="life" x1="480" y1="96" x2="480" y2="380"/>
+      <line class="life" x1="832" y1="96" x2="832" y2="380"/>
+      <line class="edge" x1="128" y1="160" x2="480" y2="160" marker-end="url(#response-loss-arrow)"/>
+      <rect class="mask" x="240" y="120" width="128" height="28"/><text x="304" y="140" text-anchor="middle">요청 ID A 전송</text>
+      <line class="edge" x1="480" y1="248" x2="832" y2="248" marker-end="url(#response-loss-arrow)"/>
+      <rect class="mask" x="572" y="208" width="168" height="28"/><text x="656" y="228" text-anchor="middle">변경과 영수증 커밋</text>
+      <line class="edge" x1="832" y1="336" x2="480" y2="336" marker-end="url(#response-loss-arrow)" stroke-dasharray="5,4"/>
+      <rect class="mask" x="592" y="296" width="128" height="28"/><text x="656" y="316" text-anchor="middle">커밋 성공</text>
+      <rect class="node" x="48" y="40" width="160" height="56" rx="6"/><text class="name" x="128" y="76" text-anchor="middle">클라이언트</text>
+      <rect class="node" x="400" y="40" width="160" height="56" rx="6"/><text class="name" x="480" y="76" text-anchor="middle">HTTP 서버</text>
+      <rect class="node" x="752" y="40" width="160" height="56" rx="6"/><text class="name" x="832" y="76" text-anchor="middle">데이터베이스</text>
+      <rect class="focal" x="48" y="392" width="160" height="64" rx="6"/><text class="name" x="128" y="432" text-anchor="middle">결과 불명</text>
+      <text x="480" y="412" text-anchor="middle">성공 응답을 보내지 않음</text><text x="480" y="440" text-anchor="middle">연결 종료</text>
+      <rect class="node" x="724" y="392" width="216" height="64" rx="6"/><text class="name" x="832" y="432" text-anchor="middle">카운터·영수증 저장됨</text>
+      <line x1="40" y1="516" x2="920" y2="516" stroke="var(--rule)"/>
+      <text x="40" y="552">실선: 요청 · 점선: 완료 응답 · 강조: 클라이언트가 아는 상태</text>
+    </svg>
+  </div>
+</body>
+</html>
