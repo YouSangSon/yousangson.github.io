@@ -102,7 +102,7 @@
 
 /* Code Blocks */
 .heti :where(pre) {
-  --at-apply: 'overflow-auto uno-round-border px-4 py-3 bg-secondary/5!';
+  --at-apply: 'overflow-auto uno-round-border px-4 py-3';
   scrollbar-width: thin;
   scrollbar-color: oklch(var(--un-preset-theme-colors-secondary) / 0) transparent;
   transition: scrollbar-color 0.3s ease-out;
@@ -112,6 +112,9 @@
 }
 .heti pre code {
   --at-apply: 'border-none bg-transparent p-0';
+}
+html.dark .heti pre:not(.mermaid) {
+  background-color: var(--shiki-dark-bg) !important;
 }
 html.dark .heti pre span {
   --at-apply: 'text-[var(--shiki-dark)]!';
@@ -137,7 +140,7 @@ html.dark .heti pre span {
   --at-apply: 'relative pl-8';
 }
 .heti code span.line::before {
-  --at-apply: 'absolute left-0 w-4 c-secondary/40 leading-1.9em';
+  --at-apply: 'absolute left-0 w-4 c-secondary leading-1.9em';
   content: counter(line);
   counter-increment: line;
   direction: rtl;

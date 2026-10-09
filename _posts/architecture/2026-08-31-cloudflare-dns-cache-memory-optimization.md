@@ -6,7 +6,7 @@ tags: [cloudflare, dns, cache, rust, memory optimization, data structure]
 date: 2026-08-31
 ---
 
-Cloudflare의 Sebastiaan Neuteboom은 [2026년 8월 27일 공개한 글](https://blog.cloudflare.com/dns-cache-memory-optimization-1111/)에서 자사 DNS 플랫폼이 **2,500억 개가 넘는 캐시 엔트리**를 보관한다고 설명했다. 이 규모에서는 엔트리마다 1바이트만 낭비해도 전체 시스템에서 250GB가 넘는 메모리를 사용하게 된다.
+Cloudflare의 Sebastiaan Neuteboom은 [2026년 8월 27일 공개한 글](https://blog.cloudflare.com/dns-cache-memory-optimization-1111/)에서 자사 DNS 플랫폼이 **2,500억 개가 넘는 캐시 엔트리**를 보관한다고 설명했다. 이 규모에서는 엔트리마다 1바이트만 낭비해도 전체 시스템에서 250GB가 넘는 메모리를 사용하게 된다. 많은 항목을 저장하는 캐시를 설계할 때 엔트리 구조의 작은 변경이 전체 메모리와 처리 비용을 어떻게 바꾸는지 이 사례로 살펴볼 수 있다.
 
 Cloudflare는 1.1.1.1을 포함한 DNS 서비스의 캐시 구조를 다섯 번에 걸쳐 개선했다. 그 결과 엔트리당 메모리 사용량은 953바이트에서 420바이트로 줄었고, 전체 서버에서 약 100TB의 메모리를 확보했다. 더 흥미로운 점은 메모리만 줄어든 것이 아니라는 것이다. 캐시 삽입 처리량은 43% 증가했고 조회 지연 시간은 19% 감소했다.
 

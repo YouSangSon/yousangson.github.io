@@ -6,7 +6,7 @@ categories: [research, ai]
 tags: [paper-review, observability, evaluation]
 ---
 
-가령 한 답변은 12초 만에 도착하고, 다른 답변은 1초 만에 도착했지만 사실과 달랐다고 하자. 두 요청 모두 HTTP 200으로 끝났다면 어느 쪽이 정상인가? 지연만 보는 대시보드는 첫 번째 요청을 잡는다. 정답을 판정하는 평가만 있다면 두 번째 요청을 잡는다. 둘 중 하나의 숫자로 두 문제를 설명할 수는 없다.
+LLM 서비스에서 한 답변은 12초 만에 도착하고 다른 답변은 1초 만에 도착했지만 사실과 달랐다고 하자. 두 요청이 모두 HTTP 200으로 끝나도 정상이라고 같은 판단을 내릴 수는 없다. 어떤 관측 신호를 모을지 정하려면 응답 지연을 찾는 지표와 답변의 정확성을 판정하는 평가가 서로 다른 문제를 잡는다는 점부터 구분해야 한다.
 
 Twinkll Sisodia의 [*AI Observability for Large Language Model Systems: A Multi-Layer Analysis of Monitoring Approaches from Confidence Calibration to Infrastructure Tracing*](https://arxiv.org/pdf/2604.26152v1)(arXiv:2604.26152v1, 2026년 4월 28일)은 이런 차이에서 출발한다.
 

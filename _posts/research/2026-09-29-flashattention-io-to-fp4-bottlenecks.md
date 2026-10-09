@@ -1,5 +1,5 @@
 ---
-title: "FlashAttention·FA4·FP4 — Tri Dao 외, Ted Zadouri 외, Robert Hu의 최적화 연구"
+title: "FlashAttention·FA4·FP4 — Tri Dao 외, Ted Zadouri 외, Robert Hu | 최적화 뒤에 남는 병목"
 description: "FlashAttention의 온라인 softmax가 HBM 왕복을 줄이는 원리부터 Blackwell용 FA4와 FP4 후속 연구의 속도·오차·학습 안정성 경계까지 세 논문으로 살펴본다."
 date: 2026-09-29
 categories: [research, ai]

@@ -23,7 +23,11 @@ async function setupMermaidEmbeds() {
     const { default: mermaid } = await import('mermaid')
     mermaid.initialize({
       startOnLoad: false,
+      flowchart: { useMaxWidth: false },
       theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
+      themeVariables: {
+        edgeLabelBackground: document.documentElement.classList.contains('dark') ? '#2e2823' : '#f7f0df',
+      },
     })
     mermaid.run()
   }
@@ -88,7 +92,11 @@ async function updateMermaidTheme() {
     const { default: mermaid } = await import('mermaid')
     mermaid.initialize({
       startOnLoad: false,
+      flowchart: { useMaxWidth: false },
       theme: isDark ? 'dark' : 'default',
+      themeVariables: {
+        edgeLabelBackground: isDark ? '#2e2823' : '#f7f0df',
+      },
     })
 
     // Reset content and re-run Mermaid

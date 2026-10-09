@@ -6,7 +6,7 @@ categories: [architecture, reliability]
 tags: [backup, restore, toctou, go, data integrity]
 ---
 
-백업 파일의 SHA-256이 맞았다. 1분 뒤 복원 명령이 같은 경로를 다시 열었다. 정말 같은 바이트를 읽을까? 파일 이름과 내용을 구분하면 사전검증의 한계가 드러난다.
+백업을 복원하기 전에 파일의 SHA-256을 확인했고 1분 뒤 복원 명령이 같은 경로를 다시 열었다. 그사이 경로가 가리키는 파일이나 파일 내용이 바뀌면 검증한 바이트와 복원할 바이트가 달라질 수 있다. 사전검증의 보장 범위를 정하려면 파일 경로, 열린 파일의 정체성, 읽을 내용이 각각 언제까지 유지되는지 구분해야 한다.
 
 Go 1.24.5로 임시 디렉터리 안에서 두 변경을 순서대로 만들었다. `current`가 처음에는 디렉터리 `a`를 가리키고, `os.OpenRoot(current)`로 열린 루트를 보관한다. 그다음 `current`를 `b`로 재지정한다. 마지막으로 `a/payload`의 내용을 같은 파일 안에서 바꾼다. [전체 테스트 코드](/assets/examples/2026-09-29/engineering-depth/restore/restore_test.go)를 내려받은 디렉터리에서 `GOTOOLCHAIN=go1.24.5 go test -v restore_test.go`로 실행할 수 있다.
 

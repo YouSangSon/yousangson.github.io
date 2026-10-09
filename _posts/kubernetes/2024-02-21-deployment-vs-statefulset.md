@@ -1,5 +1,5 @@
 ---
-title: Kubernetes Deployment vs StatefulSet 차이점
+title: "Deployment와 StatefulSet: Pod를 교체할 때 무엇을 보존할까"
 description: Pod 교체 후에도 유지해야 할 식별자가 무엇인지 두 워크로드의 장애 상황으로 판단한다.
 categories: [kubernetes]
 tags: [kubernetes, deployment, statefulset, k8s]

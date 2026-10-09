@@ -6,7 +6,7 @@ tags: [kubernetes, ingress, load balancer, k8s]
 date: 2024-02-23
 ---
 
-`https://api.example.test/v1/items`가 실패한다. DNS는 주소를 돌려주고 외부 진입점에도 연결되는데, `api` Pod는 Ready다. 이때 “Ingress가 문제인가, 로드밸런서가 문제인가”라고 둘 중 하나를 고르면 진단 범위가 너무 거칠다. 요청이 **어느 경계까지 도착했고, 어느 규칙과 백엔드를 선택했는지** 따라가야 한다.
+Kubernetes에서 `https://api.example.test/v1/items` 요청이 실패하지만 DNS는 주소를 돌려주고 외부 진입점에도 연결되며 `api` Pod는 Ready다. Ingress와 로드밸런서 중 하나를 원인으로 고르기에는 아직 범위가 넓다. 요청이 **어느 경계까지 도착했고 어느 규칙과 백엔드를 선택했는지** 따라가면 다음에 확인할 설정을 좁힐 수 있다.
 
 `example.test`와 `demo` 네임스페이스를 쓰는 가상 환경에서 흔히 쓰는 연결 구성을 따라가 보자.
 

@@ -6,7 +6,7 @@ tags: [logging, observability, security, api]
 date: 2026-09-10
 ---
 
-같은 `POST /notes/n42`에 `{}`를 보냈다. 첫 요청은 인증 전에 401로 끝났고, 둘째는 정상 처리됐다. 두 로그에 모두 `body: {}`라고 적으면 하나는 거짓말이다. 첫 요청에서 서버는 본문을 읽지 않았기 때문이다.
+HTTP 진단 로그를 비교하려고 같은 `POST /notes/n42`에 `{}`를 보냈다. 첫 요청은 인증 전에 401로 끝나 본문을 읽지 않았고 둘째는 정상 처리됐다. 두 로그에 모두 `body: {}`라고 적으면 읽지 않은 상태와 빈 본문을 구분할 수 없으므로 기록한 값뿐 아니라 수집 여부와 출처도 남겨야 한다.
 
 이를 확인하려고 Go 1.24.5의 `httptest`로 작은 **가상 메모 API 관측 모델**을 만들었다. 인증과 저장소는 실제 구현이 아니라 테스트 인자로 고정했다. 본문을 둘러싼 reader가 업무 코드가 읽은 바이트 수만 세고, 진단 기록에는 원문을 넣지 않는다. [실행 가능한 전체 예제](/assets/examples/2026-09-29/engineering-depth/diagnostic/diagnostic_test.go)를 내려받은 디렉터리에서 `GOTOOLCHAIN=go1.24.5 go test -v diagnostic_test.go`로 재현할 수 있다.
 

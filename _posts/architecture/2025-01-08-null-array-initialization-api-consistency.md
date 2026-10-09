@@ -1,5 +1,5 @@
 ---
-title: API 응답에서 Null 배열 문제 해결하기
+title: "API의 빈 목록과 null은 언제 다른 상태일까"
 description: "Go의 nil 슬라이스가 JSON null이 되는 경계부터 GET 응답과 PATCH 입력의 생략·null·빈 배열을 서로 다른 계약으로 다룬다."
 categories: [architecture, golang]
 tags: [api, mongodb, null, array, frontend, consistency, golang]
