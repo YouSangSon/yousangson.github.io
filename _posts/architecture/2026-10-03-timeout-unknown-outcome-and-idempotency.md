@@ -4,6 +4,12 @@ description: "응답 유실을 실제 HTTP로 재현하고, 같은 작업 ID의 
 categories: [architecture, distributed systems]
 tags: [http, idempotency, retry, sqlite, failure recovery]
 date: 2026-10-03
+updated: '2026-10-09'
+related:
+  - slug: kafka-poison-partition-and-commit-frontier
+    reason: 실패한 메시지의 재시도가 다른 작업에 미치는 영향을 살펴봅니다.
+  - slug: incr-reexecution-effects
+    reason: 이미 실행한 작업을 생략하려면 어떤 효과를 확인해야 하는지 비교합니다.
 ---
 
 파일 처리 API를 호출했는데 화면에는 타임아웃이 뜬다. 서버는 이미 요청을 반영했고 성공 응답만 도착하지 않았다면 다시 누르는 순간 같은 변경이 두 번 일어날 수 있다. 안전한 재시도를 설계하려면 응답을 받았는지와 별개로 같은 논리 작업을 식별하고 이미 확정된 결과를 다시 돌려줄 수 있어야 한다.

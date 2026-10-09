@@ -24,9 +24,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+      - run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm lint
       - run: pnpm build
       - run: pnpm verify
+      - run: pnpm verify:reader
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

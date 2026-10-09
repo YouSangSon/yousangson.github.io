@@ -4,6 +4,13 @@ description: "RAG에서 원본 버전과 검색에 공개한 색인 버전을 �
 categories: [architecture, distributed systems]
 tags: [rag, vector-search, embeddings, consistency, provenance]
 date: 2026-09-29
+related:
+  - slug: glie-visual-document-retrieval
+    reason: 문서 저장량과 후보 재점수 정확도를 함께 살펴봅니다.
+  - slug: denseon-lateon-multilingual-retrieval
+    reason: 단일 벡터와 토큰별 표현의 검색 품질·비용을 비교합니다.
+  - slug: vector-db-document-cleanup-strategy
+    reason: 늦게 끝난 작업이 삭제한 청크를 되살리는 경계를 살펴봅니다.
 ---
 
 사용 설명서를 새로 올렸는데 챗봇은 예전 절차를 안내한다. 새 파일이 존재한다는 사실만으로 새 내용이 검색된다고 볼 수 있을까? 파싱, 청크 분할, 임베딩, 벡터 저장, 검색이 따로 진행된다면 **최신 원본**과 **지금 검색에 공개한 색인**은 서로 다른 시각을 가리킬 수 있다.

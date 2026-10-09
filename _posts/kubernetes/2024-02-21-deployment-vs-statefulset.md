@@ -4,6 +4,14 @@ description: Pod 교체 후에도 유지해야 할 식별자가 무엇인지 두
 categories: [kubernetes]
 tags: [kubernetes, deployment, statefulset, k8s]
 date: 2024-02-21
+updated: '2026-09-29'
+related:
+  - slug: kubernetes-architecture
+    reason: 상태를 제어하는 경로와 실제 요청이 흐르는 경로를 나눠 봅니다.
+  - slug: master-worker-nodes
+    reason: 컨트롤 플레인과 노드 중 어느 구성 요소의 증거를 볼지 확인합니다.
+  - slug: ingress-vs-loadbalancer
+    reason: 외부 요청이 Ingress와 Service를 지나는 경로를 따라갑니다.
 ---
 
 Pod 하나를 지우고 같은 수로 다시 만들었다. API 서버라면 새 Pod가 준비된 뒤 요청을 받아도 된다. 그런데 데이터를 가진 클러스터의 두 번째 멤버라면 새 Pod가 **이전 두 번째 멤버의 디스크와 이름**을 찾아야 할 수 있다. 둘 다 복제본 세 개로 실행하지만, “교체”가 뜻하는 바가 다르다.

@@ -11,10 +11,16 @@ const posts = defineCollection({
     published: z.coerce.date(),
     // optional
     description: z.string().optional().default(''),
+    displayTitle: z.string().optional(),
+    attribution: z.string().optional(),
     updated: z.preprocess(
       val => val === '' ? undefined : val,
-      z.date().optional(),
+      z.coerce.date().optional(),
     ),
+    related: z.array(z.object({
+      slug: z.string().regex(/^[a-z0-9-]+$/),
+      reason: z.string().min(1),
+    })).optional().default([]),
     tags: z.array(z.string()).optional().default([]),
     categories: z.array(z.string()).optional().default([]),
     // Advanced

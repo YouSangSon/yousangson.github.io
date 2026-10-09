@@ -5,6 +5,12 @@ categories: [architecture, golang]
 tags: [api, mongodb, null, array, frontend, consistency, golang]
 date: 2025-01-08
 mermaid: true
+updated: '2026-09-29'
+related:
+  - slug: frontend-async-result-scope-and-generation
+    reason: 늦게 도착한 응답을 현재 화면에 적용할 조건을 확인합니다.
+  - slug: unified-search-security-implementation
+    reason: 검색어·권한·순위를 하나의 요청에 결합하는 경계를 살펴봅니다.
 ---
 
 화면이 `user.roles.map(...)`을 호출했는데 어떤 응답에는 `"roles": []`, 다른 응답에는 `"roles": null`이 있다면 두 번째에서 오류가 난다. 화면마다 `roles ?? []`를 넣기 전에 정할 질문은 **목록이 비어 있는 것과 목록을 모르는 것이 같은 상태인가**다. 이 글은 항목이 없을 때도 유효한 빈 목록을 반환하기로 한 **가상 API**를 사용한다. 실제 권한 조회가 실패했는데 이를 빈 역할 목록으로 바꾸는 처리는 이 계약에 포함하지 않는다.

@@ -45,7 +45,7 @@ const MarginBottom = isPost && themeConfig.comment.enabled
   <body>
     <a class="skip-link" href="#main-content">본문으로 건너뛰기</a>
     <div class="site-shell">
-      <div class="site-masthead">
+      <div class:list={['site-masthead', isPost && 'is-reading']}>
         <Header />
         <div class="site-controls">
           <Navbar />
@@ -55,7 +55,6 @@ const MarginBottom = isPost && themeConfig.comment.enabled
       <main
         id="main-content"
         class:list={['page-main', isHome && 'page-main-home', isPost && 'page-main-post', MarginBottom]}
-        data-pagefind-body={isPost ? '' : undefined}
       >
         <slot />
       </main>

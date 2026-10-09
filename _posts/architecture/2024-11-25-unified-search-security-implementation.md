@@ -4,6 +4,12 @@ description: 문자 그대로 찾기, 조회 권한, 여러 자료의 순위와 
 categories: [architecture, golang]
 tags: [search, security, mongodb, regex, golang]
 date: 2024-11-25
+updated: '2026-10-09'
+related:
+  - slug: frontend-async-result-scope-and-generation
+    reason: 늦게 도착한 응답을 현재 화면에 적용할 조건을 확인합니다.
+  - slug: null-array-initialization-api-consistency
+    reason: 화면으로 전달되는 생략·null·빈 목록의 계약을 구분합니다.
 ---
 
 검색 API에서 `a.b`를 문자 그대로 찾으려는데 입력을 정규식으로 쓰면 `axb`도 일치한다. 검색 결과를 **합친 뒤** 권한을 검사하면 다른 사람의 높은 순위 결과가 첫 페이지를 채워 내 자료가 있어도 빈 페이지가 나올 수 있다. 검색 조건과 권한 범위를 먼저 정해야 입력의 뜻과 사용자에게 보이는 결과를 함께 지킬 수 있다.

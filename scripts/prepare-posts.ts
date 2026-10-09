@@ -106,7 +106,11 @@ for (const file of files.sort()) {
   const frontmatter = {
     title,
     published: dateOnly(parsed.data.date, filenameDate, file),
+    ...(parsed.data.updated && { updated: dateOnly(parsed.data.updated, filenameDate, file) }),
     ...(typeof parsed.data.description === 'string' && { description: parsed.data.description }),
+    ...(typeof parsed.data.displayTitle === 'string' && { displayTitle: parsed.data.displayTitle }),
+    ...(typeof parsed.data.attribution === 'string' && { attribution: parsed.data.attribution }),
+    ...(Array.isArray(parsed.data.related) && { related: parsed.data.related }),
     categories,
     tags,
     ...(parsed.data.mermaid === true && { mermaid: true }),

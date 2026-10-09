@@ -4,6 +4,14 @@ description: Deployment를 제출한 뒤 Pod와 Service가 실제 요청을 받�
 categories: [kubernetes]
 tags: [kubernetes, k8s, architecture, interview]
 date: 2024-02-20
+updated: '2026-09-30'
+related:
+  - slug: master-worker-nodes
+    reason: 컨트롤 플레인과 노드 중 어느 구성 요소의 증거를 볼지 확인합니다.
+  - slug: deployment-vs-statefulset
+    reason: Pod를 교체할 때 보존해야 할 식별자로 워크로드를 비교합니다.
+  - slug: ingress-vs-loadbalancer
+    reason: 외부 요청이 Ingress와 Service를 지나는 경로를 따라갑니다.
 ---
 
 `replicas: 3`인 API Deployment를 제출했는데 `kubectl apply`는 성공했고 외부 요청은 실패한다. Kubernetes가 성공했다고 답했는데 왜 서비스는 아직 사용할 수 없을까? **API 객체를 저장하는 일, Pod 세 개를 실행하는 일, 그 Pod로 요청을 전달하는 일은 서로 다른 단계**이기 때문이다.

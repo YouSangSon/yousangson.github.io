@@ -4,7 +4,9 @@ import path from 'node:path'
 import process from 'node:process'
 import { runInNewContext } from 'node:vm'
 import glob from 'fast-glob'
+import matter from 'gray-matter'
 import { parse } from 'node-html-parser'
+import sharp from 'sharp'
 import { topics } from '../src/utils/topics'
 
 const distDir = 'dist'
@@ -111,10 +113,37 @@ async function checkUrlsAndReferences() {
     roots.set(htmlFile, parse(await fs.readFile(path.join(distDir, htmlFile), 'utf8')))
 
   for (const post of builtPosts) {
-    const content = roots.get(post)?.querySelector('#post-content')
+    const root = roots.get(post)
+    const content = root?.querySelector('#post-content')
     check(Boolean(content), `${post}: missing article body`)
     check(!content?.childNodes.some(node => node.nodeType === 3 && node.textContent.trim()), `${post}: prose escaped its paragraph; check Markdown extensions`)
     check(!content?.querySelectorAll('p').some(node => node.childNodes.length === 0), `${post}: empty paragraph in article body`)
+    check(content?.hasAttribute('data-pagefind-body'), `${post}: search scope must be the article body`)
+    check(!content?.querySelector('.related-posts, #post-date, #toc-container'), `${post}: display metadata entered the search body`)
+    check(!root?.querySelector('main')?.text.includes('읽는 데'), `${post}: reading time returned`)
+    const slug = post.split('/')[1]
+    const sourceFile = sourcePosts.find(file => file.endsWith(`-${slug}.md`))
+    const source = sourceFile ? matter(await fs.readFile(sourceFile, 'utf8')).data : undefined
+    const related = source?.related as { slug: string, reason: string }[] | undefined
+    check(related && related.length >= 2 && related.length <= 3, `${post}: curate 2–3 related posts with reasons`)
+    check(new Set(related?.map(item => item.slug)).size === related?.length, `${post}: duplicate related article`)
+    check(related?.every(item => item.slug !== slug && item.reason?.trim() && files.has(`posts/${item.slug}/index.html`)), `${post}: invalid related article or reason`)
+    check(root?.querySelectorAll('.related-posts li').length === related?.length, `${post}: missing related links`)
+    if (source?.updated) {
+      const updated = new Date(source.updated).toISOString().slice(0, 10)
+      check(root?.querySelector(`#post-date time[datetime="${updated}"]`)?.text.includes('수정'), `${post}: revision date was lost`)
+      check(updated >= new Date(source.date || path.basename(sourceFile!).slice(0, 10)).toISOString().slice(0, 10), `${post}: revision precedes publication`)
+    }
+    const image = root?.querySelector('meta[property="og:image"]')?.getAttribute('content')
+    check(image === `${siteOrigin}/social/${slug}.png`, `${post}: missing per-post sharing image`)
+    const imageFile = path.join(distDir, `social/${slug}.png`)
+    if (files.has(`social/${slug}.png`)) {
+      const dimensions = await sharp(imageFile).metadata()
+      check(dimensions.width === 1200 && dimensions.height === 630, `${post}: sharing image dimensions changed`)
+    }
+    else {
+      failures.push(`${post}: sharing image was not generated`)
+    }
   }
 
   // Coverage is based on the published corpus, not a fixed number of articles.

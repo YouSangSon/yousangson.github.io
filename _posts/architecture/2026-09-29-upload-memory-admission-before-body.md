@@ -4,6 +4,13 @@ description: "minio-go의 크기 미상 업로드에서 PartSize 기본값을 �
 categories: [architecture, optimization]
 tags: [go, streaming, backpressure, queueing, memory, minio]
 date: 2026-09-29
+related:
+  - slug: flashattention-io-to-fp4-bottlenecks
+    reason: 한 비용을 줄인 뒤 남는 메모리·계산 병목을 따라갑니다.
+  - slug: cloudflare-dns-cache-memory-optimization
+    reason: 작은 엔트리의 구조 변경이 전체 메모리 비용을 바꾸는 사례를 비교합니다.
+  - slug: file-upload-concurrency-control
+    reason: 여러 업로드가 같은 저장 용량을 갱신할 때의 경쟁을 살펴봅니다.
 ---
 
 파일을 `io.Reader`로 넘기면 메모리를 조금씩만 쓸까. 호출하는 코드가 파일 전체를 읽지 않더라도, 데이터를 받는 SDK는 전송용 버퍼를 먼저 만들 수 있다. **스트리밍은 데이터를 전달하는 방식이고, 메모리 상한은 각 단계의 할당 방식으로 정해진다.**

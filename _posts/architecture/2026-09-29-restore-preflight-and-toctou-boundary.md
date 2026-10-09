@@ -4,6 +4,12 @@ description: Go 1.24.5의 os.Root 실험으로 경로 교체와 파일 내용 �
 date: 2026-09-29
 categories: [architecture, reliability]
 tags: [backup, restore, toctou, go, data integrity]
+updated: '2026-10-09'
+related:
+  - slug: diagnostic-capture-status-and-trusted-identity
+    reason: 검사와 진단에서 실제로 확인한 대상과 읽지 않은 값을 구분합니다.
+  - slug: moving-cleanup-execution-ownership
+    reason: 실제 정리 실행과 삭제 판단을 어느 쪽이 소유하는지 비교합니다.
 ---
 
 백업을 복원하기 전에 파일의 SHA-256을 확인했고 1분 뒤 복원 명령이 같은 경로를 다시 열었다. 그사이 경로가 가리키는 파일이나 파일 내용이 바뀌면 검증한 바이트와 복원할 바이트가 달라질 수 있다. 사전검증의 보장 범위를 정하려면 파일 경로, 열린 파일의 정체성, 읽을 내용이 각각 언제까지 유지되는지 구분해야 한다.

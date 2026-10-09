@@ -4,6 +4,14 @@ description: "AI 엔지니어링 자료 모음의 평가·메모리 설명을 �
 categories: [research, ai]
 tags: [project-review, agents, evaluation, memory]
 date: 2026-09-29
+updated: '2026-10-01'
+displayTitle: 'Awesome AI Engineering: 평가부터 공부하기'
+attribution: Eric-LLMs의 학습 자료 모음
+related:
+  - slug: ai-observability-signals-and-causes
+    reason: 관측한 신호가 무엇을 증명하고 무엇은 증명하지 못하는지 나눠 봅니다.
+  - slug: agent-harness-design-evidence
+    reason: 평가 대상이 되는 위임·도구·컨텍스트의 경계를 살펴봅니다.
 ---
 
 에이전트가 파일을 저장했다고 답했다. 문장은 자연스럽고 경로도 그럴듯하다. 하지만 파일이 없거나, 파일은 만들었어도 수정하면 안 되는 다른 파일을 건드렸다면 작업은 성공한 것일까.

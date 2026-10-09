@@ -5,6 +5,12 @@ categories: [debugging, golang]
 tags: [cpu, goroutine, channel, debugging, performance, streaming, golang]
 date: 2024-12-25
 mermaid: true
+updated: '2026-09-29'
+related:
+  - slug: thread
+    reason: 동시 실행과 공유 자원의 기본 관계부터 살펴봅니다.
+  - slug: goroutine
+    reason: 고루틴의 실행 능력과 대기 중인 작업 수를 구분합니다.
 ---
 
 스트리밍 루프가 채널이 닫힌 뒤에도 끝나지 않는다고 하자. 새 데이터는 없는데 수신 case가 계속 선택되고, `default`는 한 번도 실행되지 않는다. 이 상황을 '채널이 비었으니 수신은 기다릴 것'이라고 예상하면 원인을 놓친다. **닫히고 비워진 채널의 수신은 즉시 완료되기 때문이다.**

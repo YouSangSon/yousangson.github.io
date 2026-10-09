@@ -10,16 +10,54 @@ import Layout from '@/layouts/Layout.astro'
   </section>
   <link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
   <script is:inline src="/pagefind/pagefind-ui.js"></script>
-  <script is:inline>
-function initSearch() {
-  const container = document.getElementById('search')
-  if (container && !container.children.length && window.PagefindUI) {
-    void new window.PagefindUI({ element: '#search', showSubResults: true, showImages: false, translations: { placeholder: '검색어를 입력하세요' } })
-  }
-}
-initSearch()
-document.addEventListener('astro:page-load', initSearch)
-</script>
+  <script>
+    interface SearchUI {
+      triggerSearch: (term: string) => void
+      destroy: () => void
+    }
+    declare global {
+      interface Window {
+        PagefindUI?: new (options: Record<string, unknown>) => SearchUI
+      }
+    }
+
+    let search: SearchUI | undefined
+    let searchContainer: HTMLElement | null = null
+
+    function rememberTerm(term: string) {
+      const url = new URL(window.location.href)
+      if (term.trim())
+        url.searchParams.set('q', term)
+      else
+        url.searchParams.delete('q')
+      // Preserve Astro's navigation state; typing must not add history entries.
+      window.history.replaceState(window.history.state, '', url)
+    }
+
+    function initSearch() {
+      const container = document.getElementById('search')
+      if (!container || !window.PagefindUI)
+        return
+      if (container !== searchContainer) {
+        search?.destroy()
+        searchContainer = container
+        search = new window.PagefindUI({ element: '#search', showSubResults: true, showImages: false, translations: { placeholder: '검색어를 입력하세요' } })
+        container.addEventListener('input', (event) => {
+          if (event.target instanceof HTMLInputElement && event.target.matches('.pagefind-ui__search-input'))
+            rememberTerm(event.target.value)
+        })
+        container.addEventListener('click', (event) => {
+          if (event.target instanceof Element && event.target.closest('.pagefind-ui__search-clear'))
+            rememberTerm('')
+        })
+      }
+      search?.triggerSearch(new URL(window.location.href).searchParams.get('q') || '')
+    }
+
+    initSearch()
+    document.addEventListener('astro:page-load', initSearch)
+    window.addEventListener('popstate', initSearch)
+  </script>
 </Layout>
 <style is:global>
   #search { --pagefind-ui-primary: oklch(var(--un-preset-theme-colors-primary)); --pagefind-ui-text: oklch(var(--un-preset-theme-colors-primary)); --pagefind-ui-background: oklch(var(--un-preset-theme-colors-background)); --pagefind-ui-border: #89867e; --pagefind-ui-border-radius: 6px; --pagefind-ui-font: inherit; }

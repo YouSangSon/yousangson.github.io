@@ -4,6 +4,14 @@ description: "1972년 Parnas 논문의 KWIC 예제를 따라가며 처리 단계
 categories: [research, computer science]
 tags: [paper-review, modularity, information-hiding, software-design]
 date: 2026-09-29
+updated: '2026-10-09'
+displayTitle: 'Parnas의 모듈 분해: 실행 단계보다 숨길 결정'
+attribution: Decomposing Systems into Modules — D. L. Parnas
+related:
+  - slug: moving-cleanup-execution-ownership
+    reason: 함수를 옮긴 뒤에도 보호 판단과 호환 진입점이 남는지 확인합니다.
+  - slug: agent-harness-design-evidence
+    reason: 에이전트 위임에서도 계약과 권한 경계를 따로 살펴봅니다.
 ---
 
 문자열 저장 방식을 바꾸자 입력부터 출력까지 전부 수정해야 하는 프로그램이 있다. 입력·변환·정렬·출력 함수는 나눴지만 각 단계가 같은 저장 구조를 직접 읽고 있었기 때문이다. 모듈을 나눌 때 실행 순서보다 **바뀔 수 있는 결정을 어디에 숨길지**를 기준으로 삼으면 구현을 바꿀 때 호출자까지 고쳐야 하는 경우를 줄일 수 있다.

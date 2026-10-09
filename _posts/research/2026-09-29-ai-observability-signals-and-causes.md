@@ -4,6 +4,14 @@ description: "AI Observability for Large Language Model Systems를 읽으며 확
 date: 2026-09-29
 categories: [research, ai]
 tags: [paper-review, observability, evaluation]
+updated: '2026-10-09'
+displayTitle: 'AI 관측성: 신호와 원인의 구분'
+attribution: AI Observability for Large Language Model Systems — Twinkll Sisodia
+related:
+  - slug: awesome-ai-engineering-evaluation-first
+    reason: 답변의 모양과 실제 작업 결과를 구분하는 평가 사례를 읽습니다.
+  - slug: agent-harness-design-evidence
+    reason: 평가 대상이 되는 위임·도구·컨텍스트의 경계를 살펴봅니다.
 ---
 
 LLM 서비스에서 한 답변은 12초 만에 도착하고 다른 답변은 1초 만에 도착했지만 사실과 달랐다고 하자. 두 요청이 모두 HTTP 200으로 끝나도 정상이라고 같은 판단을 내릴 수는 없다. 어떤 관측 신호를 모을지 정하려면 응답 지연을 찾는 지표와 답변의 정확성을 판정하는 평가가 서로 다른 문제를 잡는다는 점부터 구분해야 한다.

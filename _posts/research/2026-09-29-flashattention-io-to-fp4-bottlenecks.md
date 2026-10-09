@@ -4,6 +4,14 @@ description: "FlashAttention의 온라인 softmax가 HBM 왕복을 줄이는 원
 date: 2026-09-29
 categories: [research, ai]
 tags: [paper-review, attention, optimization]
+updated: '2026-10-01'
+displayTitle: 'FlashAttention·FA4·FP4: 최적화 뒤에 남는 병목'
+attribution: FlashAttention — Tri Dao 외 · FA4 — Ted Zadouri 외 · FP4 후속 연구 — Robert Hu
+related:
+  - slug: cloudflare-dns-cache-memory-optimization
+    reason: 작은 엔트리의 구조 변경이 전체 메모리 비용을 바꾸는 사례를 비교합니다.
+  - slug: upload-memory-admission-before-body
+    reason: 버퍼 크기와 동시 작업 수가 메모리 상한을 만드는 과정을 확인합니다.
 ---
 
 행렬곱이 네 배 빨라지면 attention도 네 배 빨라질까? 2026년 9월의 FP4 연구에서는 그렇게 되지 않는 이유를 살펴본다. 점수와 출력을 만드는 행렬곱을 4비트 부동소수점(FP4)으로 계산해도, 그 사이에서 점수를 softmax 확률로 바꾸고 다음 행렬곱이 읽을 수 있게 만드는 시간이 남는다. 게다가 커널 하나가 빨라졌다고 모델 학습이 같은 비율로 빨라지거나, 낮은 정밀도가 긴 학습에서 안정적이라는 뜻도 아니다. [FP4 후속 연구](https://arxiv.org/pdf/2609.04105v1#page=2)

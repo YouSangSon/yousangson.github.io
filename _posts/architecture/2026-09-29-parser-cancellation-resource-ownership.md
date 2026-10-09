@@ -4,6 +4,14 @@ description: "호출자의 취소와 실제 스레드 종료를 나누고, 임�
 categories: [architecture, optimization]
 tags: [asyncio, cancellation, resource-lifetime, subprocess]
 date: 2026-09-29
+updated: '2026-10-09'
+related:
+  - slug: cancellation-does-not-kill-running-threads
+    reason: 취소 신호와 실행 중인 스레드의 실제 종료를 구분합니다.
+  - slug: virtual-threads-in-kotlin
+    reason: 가상 스레드와 코루틴의 실행 위치와 자원 수명을 비교합니다.
+  - slug: vector-db-document-cleanup-strategy
+    reason: 늦게 끝난 작업이 삭제한 청크를 되살리는 경계를 살펴봅니다.
 ---
 
 가상의 문서 변환기에서 요청이 취소되자 `finally`에서 임시 디렉터리를 지운다고 하자. 요청은 끝났고 처리 슬롯도 반환됐지만, 별도 스레드에서 실행 중이던 변환 함수는 그제야 입력 파일을 열려고 한다. 이때 파일 읽기가 실패한다면, 원인은 파일 자체보다 **요청의 종료와 파일 사용자의 종료를 같은 사건으로 취급한 것**에 있다.

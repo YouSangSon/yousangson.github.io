@@ -4,6 +4,14 @@ description: 하나의 HTTP 요청이 외부 진입점에서 Ingress 규칙과 S
 categories: [kubernetes]
 tags: [kubernetes, ingress, load balancer, k8s]
 date: 2024-02-23
+updated: '2026-10-09'
+related:
+  - slug: kubernetes-architecture
+    reason: 상태를 제어하는 경로와 실제 요청이 흐르는 경로를 나눠 봅니다.
+  - slug: master-worker-nodes
+    reason: 컨트롤 플레인과 노드 중 어느 구성 요소의 증거를 볼지 확인합니다.
+  - slug: deployment-vs-statefulset
+    reason: Pod를 교체할 때 보존해야 할 식별자로 워크로드를 비교합니다.
 ---
 
 Kubernetes에서 `https://api.example.test/v1/items` 요청이 실패하지만 DNS는 주소를 돌려주고 외부 진입점에도 연결되며 `api` Pod는 Ready다. Ingress와 로드밸런서 중 하나를 원인으로 고르기에는 아직 범위가 넓다. 요청이 **어느 경계까지 도착했고 어느 규칙과 백엔드를 선택했는지** 따라가면 다음에 확인할 설정을 좁힐 수 있다.

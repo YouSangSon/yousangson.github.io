@@ -5,6 +5,12 @@ categories: [architecture, golang]
 tags: [concurrency, distributed lock, redis, mongodb, transaction, file upload, golang]
 date: 2024-12-15
 mermaid: true
+updated: '2026-10-09'
+related:
+  - slug: upload-memory-admission-before-body
+    reason: 저장 용량과 별도로 업로드 버퍼의 메모리 상한을 계산합니다.
+  - slug: membership-projection-atomic-commit
+    reason: 원본과 조회용 합계를 함께 갱신하는 완료 조건을 비교합니다.
 ---
 
 사진 A와 B는 파일 이름도 객체 키도 다른데 같은 보관함의 사용량을 읽고 쓰는 두 업로드 요청이 충돌한다. 파일 이름별로 잠가도 두 요청이 공유하는 용량 기록은 보호되지 않는다. 어떤 값을 함께 읽고 갱신하는지 따라가면 용량 제한을 지킬 잠금 범위를 찾을 수 있다. 아래 숫자는 설명을 위한 가상 값이다. 용량 상한이 10MiB, 이미 확정된 사용량이 4MiB이고 각 사진이 4MiB라고 하자.

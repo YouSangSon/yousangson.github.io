@@ -3,6 +3,12 @@ title: 고루틴과 GOMAXPROCS 이해하기 — Go 1.24.5 기준
 categories: [golang, goroutine]
 tags: [golang, goroutine, concurrency] # TAG names should alw   ays be lowercase
 description: Go 1.24.5의 고루틴과 GOMAXPROCS 기본값, 컨테이너 CPU 제한, 작업 수명과 자원 사용을 구분한다.
+updated: '2026-09-29'
+related:
+  - slug: thread
+    reason: 동시 실행과 공유 자원의 기본 관계부터 살펴봅니다.
+  - slug: cpu-100-percent-goroutine-leak-fix
+    reason: 종료된 채널이 대기를 없애고 CPU를 소모하는 반례를 확인합니다.
 ---
 
 `GOMAXPROCS=1`이면 고루틴도 하나만 만들 수 있을까? 아니다. 두 고루틴을 만들어 채널 앞까지 진행시키고, 둘 다 나중에 완료할 수 있다. 이 값은 **동시에 Go 코드를 실행하는 능력**을 제한한다. 대기 중인 작업 수, OS 스레드 총수, 요청 수의 상한이 아니다.

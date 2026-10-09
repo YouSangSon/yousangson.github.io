@@ -4,6 +4,14 @@ description: 두 Go 패키지로 정리 책임을 옮긴 예제에서 정확한 
 categories: [architecture, refactoring]
 tags: [go, modularity, refactoring, testing, cleanup]
 date: 2026-09-10
+updated: '2026-10-09'
+related:
+  - slug: parnas-modularity-hidden-decisions
+    reason: 실행 단계 대신 바뀔 결정을 기준으로 책임을 나눠 봅니다.
+  - slug: agent-harness-design-evidence
+    reason: 에이전트 위임에서도 계약과 권한 경계를 따로 살펴봅니다.
+  - slug: restore-preflight-and-toctou-boundary
+    reason: 사전검증 이후 경로와 내용이 바뀔 수 있는 경우를 확인합니다.
 ---
 
 정리 함수를 다른 패키지로 옮긴 뒤 테스트는 초안 한 건이 삭제됐다고 보고했다. 예전 패키지가 여전히 삭제 여부를 판단해도 같은 테스트는 통과한다. 함수 이동을 검증하려면 파일의 위치뿐 아니라 **보호 조건을 판단하고 변경을 실행하는 위치**까지 따라가야 한다.

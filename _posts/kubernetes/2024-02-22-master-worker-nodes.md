@@ -4,6 +4,14 @@ description: 같은 Pending 표시를 스케줄링 실패와 노드의 이미지
 categories: [kubernetes]
 tags: [kubernetes, master node, worker node, k8s]
 date: 2024-02-22
+updated: '2026-10-09'
+related:
+  - slug: kubernetes-architecture
+    reason: 상태를 제어하는 경로와 실제 요청이 흐르는 경로를 나눠 봅니다.
+  - slug: deployment-vs-statefulset
+    reason: Pod를 교체할 때 보존해야 할 식별자로 워크로드를 비교합니다.
+  - slug: ingress-vs-loadbalancer
+    reason: 외부 요청이 Ingress와 Service를 지나는 경로를 따라갑니다.
 ---
 
 Kubernetes의 두 Pod가 모두 `Pending`으로 보인다. 하나는 실행할 노드를 아직 못 찾았고 다른 하나는 이미 노드에 배치됐지만 이미지를 가져오지 못했다. 노드 부족을 같은 처방으로 적용하기 전에 **Pod가 어느 단계까지 갔는지** 확인하면 스케줄링을 담당하는 컨트롤 플레인과 실행을 담당하는 워커 중 어디를 조사할지 정할 수 있다.

@@ -4,6 +4,11 @@ description: "재시도로 고칠 수 없는 입력과 일시적 실패를 나�
 categories: [architecture, distributed systems]
 tags: [kafka, backpressure, retry, head-of-line-blocking, python]
 date: 2026-09-29
+related:
+  - slug: timeout-unknown-outcome-and-idempotency
+    reason: 응답을 잃은 뒤 같은 작업을 재전송하는 조건을 확인합니다.
+  - slug: incr-reexecution-effects
+    reason: 이미 실행한 작업을 생략하려면 어떤 효과를 확인해야 하는지 비교합니다.
 ---
 
 소비자 프로세스가 살아 있고 브로커와도 연결돼 있는데 정상 문서 처리가 진행되지 않는다. 잘못된 메시지가 있는 파티션만 느릴 것으로 예상했지만, 다른 파티션의 메시지도 기다린다. 두 파티션이 같은 실행 슬롯을 쓰고 실패한 작업이 재시도하는 동안 그 슬롯을 붙잡고 있다면 가능한 현상이다.

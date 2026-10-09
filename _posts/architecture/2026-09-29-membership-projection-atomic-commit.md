@@ -4,6 +4,12 @@ description: "원본과 조회용 합계를 함께 커밋하는 방법, 비동�
 categories: [architecture, consistency]
 tags: [transaction, materialized-view, concurrency, sqlite, mongodb]
 date: 2026-09-29
+updated: '2026-10-09'
+related:
+  - slug: file-upload-concurrency-control
+    reason: 여러 업로드가 같은 저장 용량을 갱신할 때의 경쟁을 살펴봅니다.
+  - slug: upload-memory-admission-before-body
+    reason: 저장 용량과 별도로 업로드 버퍼의 메모리 상한을 계산합니다.
 ---
 
 주문 수량이 1에서 2로 바뀌었는데 요약 화면에는 합계 1이 남았다. 원본 행과 빠른 조회용 합계를 따로 갱신하면 성공 응답 뒤에도 이런 차이가 생길 수 있다. 조회 API의 일관성을 정하려면 두 값을 함께 확정할지, 늦게 반영되는 값을 어느 시점의 결과로 보여 줄지 먼저 선택해야 한다. 아래 주문·합계·revision은 실제 업무가 아닌 가상 예제다. 이 예제에서는 합계가 수량과 같고 revision은 원본이 바뀔 때 증가한다고 가정한다.

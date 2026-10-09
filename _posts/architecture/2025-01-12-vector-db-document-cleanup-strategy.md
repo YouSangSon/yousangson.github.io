@@ -5,6 +5,12 @@ categories: [architecture, golang]
 tags: [vector db, milvus, data consistency, retry, distributed systems, golang]
 date: 2025-01-12
 mermaid: true
+updated: '2026-10-09'
+related:
+  - slug: parser-cancellation-resource-ownership
+    reason: 호출자의 취소 뒤에도 계속 실행되는 작업의 책임을 확인합니다.
+  - slug: immutable-versions-through-rag-pipeline
+    reason: 부분 색인과 버전 전환이 만드는 검색 일관성 문제를 비교합니다.
 ---
 
 벡터 검색에서 가상의 문서 `manual` 버전 1을 지웠는데 잠시 뒤 청크가 다시 나타났다. 삭제 전에 시작한 임베딩 작업이 늦게 저장하면 삭제 호출이 성공해도 이런 일이 생긴다. 문서 삭제를 설계할 때는 검색에서 숨기는 시점과 실행 중인 writer가 더는 쓰지 못하는 시점을 나눠야 한다. 모든 이름과 상태는 이 설명을 위한 가상 값이다.

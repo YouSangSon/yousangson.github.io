@@ -4,6 +4,14 @@ description: 요청 본문을 읽지 않은 경우와 빈 JSON을 읽은 경우�
 categories: [architecture, observability]
 tags: [logging, observability, security, api]
 date: 2026-09-10
+updated: '2026-10-09'
+related:
+  - slug: restore-preflight-and-toctou-boundary
+    reason: 사전검증 이후 경로와 내용이 바뀔 수 있는 경우를 확인합니다.
+  - slug: moving-cleanup-execution-ownership
+    reason: 실제 정리 실행과 삭제 판단을 어느 쪽이 소유하는지 비교합니다.
+  - slug: gitlab-ci-kubernetes-networkpolicy-rbac-debugging
+    reason: 빌드 이후 배포가 막힐 때 연결·권한·스토리지 경계를 구분합니다.
 ---
 
 HTTP 진단 로그를 비교하려고 같은 `POST /notes/n42`에 `{}`를 보냈다. 첫 요청은 인증 전에 401로 끝나 본문을 읽지 않았고 둘째는 정상 처리됐다. 두 로그에 모두 `body: {}`라고 적으면 읽지 않은 상태와 빈 본문을 구분할 수 없으므로 기록한 값뿐 아니라 수집 여부와 출처도 남겨야 한다.

@@ -8,10 +8,9 @@ type DateFormat = ThemeConfig['global']['dateFormat']
 interface Props {
   date: Date
   updatedDate?: Date
-  minutes: number
 }
 
-const { date, updatedDate, minutes } = Astro.props
+const { date, updatedDate } = Astro.props
 const { dateFormat: format } = themeConfig.global
 const isPost = isPostPage(Astro.url.pathname)
 const timeSpacingClass = isPost ? 'ml-1.75' : 'ml-1.5'
@@ -74,8 +73,3 @@ function formatDate(date: Date, format: DateFormat) {
   {language.startsWith('ko') ? '수정' : 'updated'} {formatDate(updatedDate, format)}
   </time>
 )}
-
-<!-- reading time -->
-<span class={timeSpacingClass}>
-  {language.startsWith('ko') ? `읽는 데 ${Math.max(1, Math.ceil(minutes))}분` : `${Math.max(1, Math.ceil(minutes))} min`}
-</span>

@@ -4,6 +4,14 @@ description: "MapReduce의 장애 복구와 Incr의 수정 후 재실행을 비�
 date: 2026-09-29
 categories: [research, systems]
 tags: [paper-review, incremental-computation, shell, fault-tolerance]
+updated: '2026-10-01'
+displayTitle: 'Incr: 다시 실행할 때 생략해도 되는 것'
+attribution: Yizheng Xie 외
+related:
+  - slug: timeout-unknown-outcome-and-idempotency
+    reason: 응답을 잃은 뒤 같은 작업을 재전송하는 조건을 확인합니다.
+  - slug: kafka-poison-partition-and-commit-frontier
+    reason: 실패한 메시지의 재시도가 다른 작업에 미치는 영향을 살펴봅니다.
 ---
 
 스크립트의 앞부분을 고쳤지만 최종 파일은 예전과 같을 때, 뒤의 명령도 다시 실행해야 할까? `sort`의 입력 바이트가 그대로라면 계산을 되풀이할 이유는 없어 보인다. 그런데 `sort` 뒤에 파일을 쓰는 명령이 있다면 이야기가 달라진다. 그 명령을 실행하지 않더라도 이번 실행에서 있어야 할 파일과 출력 스트림은 만들어야 한다.

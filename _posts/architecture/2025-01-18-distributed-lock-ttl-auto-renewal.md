@@ -5,6 +5,12 @@ categories: [architecture, golang]
 tags: [distributed lock, redis, ttl, sse, streaming, golang]
 date: 2025-01-18
 mermaid: true
+updated: '2026-10-09'
+related:
+  - slug: redis-lock-queue-race-condition-fix
+    reason: 큐에서 꺼낸 작업의 책임과 실패 후 복구 조건을 확인합니다.
+  - slug: kafka-vs-redis-realtime-messaging
+    reason: 메시지 유실을 복구할 수 있는 범위를 전달 방식별로 비교합니다.
 ---
 
 작업 A가 락을 잡고 멈췄고 10초 뒤 락이 만료되어 B가 작업을 끝냈다. A가 뒤늦게 깨어나 결과를 저장하면 락은 정상이어도 데이터는 A의 오래된 결과로 돌아갈 수 있다. 분산 작업의 안전성을 판단하려면 락의 유효 기간을 늘리는 일과 만료된 소유자의 쓰기를 막는 일을 구분해야 한다.

@@ -7,12 +7,14 @@
   "repository": "https://github.com/YouSangSon/yousangson.github.io",
   "scripts": {
     "dev": "pnpm prepare-posts && ASTRO_TELEMETRY_DISABLED=1 astro dev",
-    "build": "pnpm prepare-posts && ASTRO_TELEMETRY_DISABLED=1 astro check && ASTRO_TELEMETRY_DISABLED=1 astro build --force && pnpm apply-lqip && pagefind --site dist",
+    "build": "pnpm prepare-posts && ASTRO_TELEMETRY_DISABLED=1 astro check && ASTRO_TELEMETRY_DISABLED=1 astro build --force && pnpm apply-lqip && pnpm generate-social-cards && pagefind --site dist",
     "preview": "astro preview",
     "astro": "astro",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "apply-lqip": "tsx scripts/apply-lqip.ts",
+    "generate-social-cards": "tsx scripts/generate-social-cards.ts",
+    "verify:reader": "ASTRO_TELEMETRY_DISABLED=1 node scripts/verify-reader-flow.mjs",
     "prepare-posts": "tsx scripts/prepare-posts.ts",
     "verify": "node scripts/verify-markdown.mjs && tsx scripts/verify-site.ts"
   },

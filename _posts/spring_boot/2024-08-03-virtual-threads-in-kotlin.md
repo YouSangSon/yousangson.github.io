@@ -4,6 +4,12 @@ description: Java 21과 Spring Boot 3.2에서 요청 스레드와 코루틴 disp
 categories: [spring boot, kotlin]
 tags: [spring boot, virtual thread, coroutine, kotlin, java21]
 date: 2024-08-03
+updated: '2026-09-30'
+related:
+  - slug: cancellation-does-not-kill-running-threads
+    reason: 취소 신호와 실행 중인 스레드의 실제 종료를 구분합니다.
+  - slug: parser-cancellation-resource-ownership
+    reason: 작업 취소 뒤 임시파일과 처리 슬롯을 해제할 시점을 확인합니다.
 ---
 
 `spring.threads.virtual.enabled=true`를 설정하고 Kotlin `suspend` 함수를 호출했다. 그러면 그 함수의 모든 코드가 가상 스레드에서 실행될까? **설정이 바꾸는 Spring 실행 경로와 코루틴이 선택하는 dispatcher는 서로 다른 경계**다. 실제 호출이 어느 경계를 지나는지 확인하지 않으면 설정만으로 실행 스레드를 예측할 수 없다.

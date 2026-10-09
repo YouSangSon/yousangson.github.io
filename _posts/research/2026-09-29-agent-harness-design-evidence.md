@@ -4,6 +4,16 @@ description: "70개 에이전트 시스템을 비교한 논문으로 위임·컨
 categories: [research, ai]
 tags: [paper-review, agents, architecture]
 date: 2026-09-29
+updated: '2026-10-09'
+displayTitle: 'AI Agent Harness: 위임의 계약과 권한 경계'
+attribution: Architectural Design Decisions in AI Agent Harnesses — Hu Wei
+related:
+  - slug: parnas-modularity-hidden-decisions
+    reason: 실행 단계 대신 바뀔 결정을 기준으로 책임을 나눠 봅니다.
+  - slug: moving-cleanup-execution-ownership
+    reason: 함수를 옮긴 뒤에도 보호 판단과 호환 진입점이 남는지 확인합니다.
+  - slug: ai-observability-signals-and-causes
+    reason: 관측한 신호가 무엇을 증명하고 무엇은 증명하지 못하는지 나눠 봅니다.
 ---
 
 문서 수정 에이전트가 하위 에이전트에게 실패한 테스트와 파일 경로만 넘겼다고 하자. “이전 버전의 예제는 계속 동작해야 한다”는 조건을 받지 못한 하위 에이전트는 옛 예제를 지우고 테스트를 통과시킨다. 에이전트의 위임 구조를 설계할 때는 이런 계약 누락을 막고 도구가 있다는 이유로 승인받지 않은 배포까지 실행하지 못하도록 권한 경계도 정해야 한다.

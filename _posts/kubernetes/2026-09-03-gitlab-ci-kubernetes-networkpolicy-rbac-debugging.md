@@ -4,6 +4,12 @@ description: CI의 API 연결 실패, NetworkPolicy 생성 거부, PVC 대기를
 categories: [kubernetes, devops]
 tags: [kubernetes, gitlab ci, rbac, serviceaccount, networkpolicy, pvc]
 date: 2026-09-03
+updated: '2026-09-30'
+related:
+  - slug: jib
+    reason: 이미지의 레이어·캐시·레지스트리 전송이 각각 달라지는 조건을 살펴봅니다.
+  - slug: diagnostic-capture-status-and-trusted-identity
+    reason: 진단 결과의 빈칸에도 수집 상태와 대상의 출처를 남깁니다.
 ---
 
 CI 배포 job이 실패했다. 첫 실행은 Kubernetes API 연결 시간 초과, 연결을 고친 다음 실행은 `NetworkPolicy` 생성 `Forbidden`, 권한을 바로잡은 다음에는 영구 스토리지 요청인 PVC가 `Pending`이다. job 이름은 하나여도 세 실패는 같은 원인으로 이어지지 않는다. **각 시도의 마지막으로 확인된 경계**를 기록해야 다음 수정을 고를 수 있다.

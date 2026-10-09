@@ -5,6 +5,12 @@ categories: [architecture, messaging]
 tags: [kafka, redis, websocket, sse, realtime, pub/sub, streaming, golang]
 date: 2024-12-10
 mermaid: true
+updated: '2026-10-09'
+related:
+  - slug: distributed-lock-ttl-auto-renewal
+    reason: 락의 만료 뒤에도 이전 작업이 계속 실행되는 경우를 살펴봅니다.
+  - slug: redis-lock-queue-race-condition-fix
+    reason: 큐에서 꺼낸 작업의 책임과 실패 후 복구 조건을 확인합니다.
 ---
 
 스트리밍 답변을 받던 브라우저가 잠깐 끊겼고 다시 연결하니 뒤쪽 문장만 보인다. 브로커를 고를 때는 발행한 이벤트를 보관하는 기능과 브라우저가 놓친 부분을 다시 보내는 기능을 구분해야 한다. Kafka와 Redis의 차이를 이 두 책임으로 나누면 연결 복구에 어떤 상태와 전달 기능이 필요한지 판단할 수 있다.

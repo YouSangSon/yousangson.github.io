@@ -33,7 +33,7 @@ const { posts, lang, pinned = false, headingLevel: Heading = 'h2', showDescripti
               transition:name={`post-${slug}${lang ? `-${lang}` : ''}`}
               data-disable-theme-toggle-transition
             >
-              {post.data.title}
+              {post.data.displayTitle || post.data.title}
             </a>
             {/* pinned icon */}
             {pinned && (
@@ -44,6 +44,7 @@ const { posts, lang, pinned = false, headingLevel: Heading = 'h2', showDescripti
               />
             )}
           </Heading>
+          {post.data.attribution && <p class="post-attribution post-list-attribution">{post.data.attribution}</p>}
 
           <div
             class="post-list-meta"
@@ -52,7 +53,7 @@ const { posts, lang, pinned = false, headingLevel: Heading = 'h2', showDescripti
           >
             <PostDate
               date={post.data.published}
-              minutes={post.remarkPluginFrontmatter.minutes}
+              updatedDate={post.data.updated}
             />
           </div>
 

@@ -4,6 +4,14 @@ description: "DPR의 단일 벡터와 ColBERT의 토큰별 MaxSim을 비교하�
 date: 2026-09-29
 categories: [research, ai]
 tags: [paper-review, retrieval, embeddings, colbert, multilingual]
+updated: '2026-10-01'
+displayTitle: 'DenseOn with the LateOn: 검색 표현의 차이'
+attribution: Raphaël Sourty 외 · 단일 벡터와 토큰별 검색
+related:
+  - slug: glie-visual-document-retrieval
+    reason: 문서 저장량과 후보 재점수 정확도를 함께 살펴봅니다.
+  - slug: immutable-versions-through-rag-pipeline
+    reason: 검색 결과가 어떤 문서 버전을 인용하는지 이어서 확인합니다.
 ---
 
 검색 질의에 단서가 두 개 있다. 한 문서는 첫 단서만 두 번 말하고, 다른 문서는 두 단서를 각각 담았다. 문서마다 벡터를 하나만 남기면 두 문서가 같은 점수를 받을 수 있다. 단서별로 문서 안에서 가장 가까운 표현을 찾으면 순위가 갈린다. 이 작은 차이가 학습 때 보지 못한 언어로 검색기를 옮길 때도 남을까?

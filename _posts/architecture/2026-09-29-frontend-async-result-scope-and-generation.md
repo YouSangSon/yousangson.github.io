@@ -4,6 +4,11 @@ description: "선택 범위와 요청 세대를 분리해 늦은 성공·실패�
 categories: [architecture, frontend]
 tags: [react, abortcontroller, race condition, search, ime]
 date: 2026-09-29
+related:
+  - slug: null-array-initialization-api-consistency
+    reason: 화면으로 전달되는 생략·null·빈 목록의 계약을 구분합니다.
+  - slug: unified-search-security-implementation
+    reason: 검색어·권한·순위를 하나의 요청에 결합하는 경계를 살펴봅니다.
 ---
 
 검색창에 `보고`를 입력하고 곧바로 `보고서`로 바꿨다. 두 번째 결과가 먼저 도착했는데 첫 번째 응답이 뒤늦게 화면을 덮는다. 응답 자체는 성공했지만 **현재 화면의 결과는 아니다**. 이 문제는 응답 순서를 통제해서 해결하기보다, 상태를 쓰기 직전에 “이 결과의 소유자가 지금도 같은가”를 확인하는 편이 작고 정확하다.

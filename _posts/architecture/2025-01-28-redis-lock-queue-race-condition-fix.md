@@ -5,6 +5,12 @@ categories: [architecture, golang]
 tags: [redis, race condition, distributed systems, lock queue, golang]
 date: 2025-01-28
 mermaid: true
+updated: '2026-10-09'
+related:
+  - slug: distributed-lock-ttl-auto-renewal
+    reason: 락의 만료 뒤에도 이전 작업이 계속 실행되는 경우를 살펴봅니다.
+  - slug: kafka-vs-redis-realtime-messaging
+    reason: 메시지 유실을 복구할 수 있는 범위를 전달 방식별로 비교합니다.
 ---
 
 Redis 리스트에서 작업 X를 꺼낸 직후 워커가 종료됐다. `RPOP`은 성공해 큐 길이가 줄었지만 작업 결과는 없다. 큐를 설계할 때 가져온 작업을 완료로 처리하면 안 되는 이유와, 재전달·중복 실행을 다룰 상태를 이 실패 순서에서 찾을 수 있다.

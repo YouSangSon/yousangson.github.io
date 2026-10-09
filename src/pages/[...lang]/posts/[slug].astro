@@ -9,9 +9,9 @@ import BackButton from '@/components/Widgets/BackButton.astro'
 import TOC from '@/components/Widgets/TOC.astro'
 import { allLocales } from '@/config'
 import { getLangFromLocale, getLangRouteParam } from '@/i18n/lang'
-import { getLocalizedPath } from '@/i18n/path'
+import { getLocalizedPath, getPostPath } from '@/i18n/path'
 import Layout from '@/layouts/Layout.astro'
-import { checkPostSlugDuplication } from '@/utils/content'
+import { checkPostSlugDuplication, getPosts } from '@/utils/content'
 import { getPostDescription } from '@/utils/description'
 import { getPostTopic } from '@/utils/topics'
 
@@ -80,7 +80,12 @@ const currentLang = getLangFromLocale(Astro.currentLocale)
 const slug = post.data.abbrlink || post.id
 const description = getPostDescription(post, 'meta')
 const topic = getPostTopic(slug)
-const { Content, headings, remarkPluginFrontmatter } = await render(post)
+const { Content, headings } = await render(post)
+const allPosts = await getPosts(currentLang)
+const related = post.data.related.map(({ slug: relatedSlug, reason }) => ({
+  post: allPosts.find(item => (item.data.abbrlink || item.id) === relatedSlug),
+  reason,
+})).filter(item => item.post)
 ---
 
 <Layout
@@ -95,46 +100,57 @@ const { Content, headings, remarkPluginFrontmatter } = await render(post)
       <!-- Go Back Button On Desktop -->
       <BackButton />
       <!-- Title -->
-      <h1 class="post-title">
+      <h1 class="post-title" data-pagefind-meta="title[data-search-title]" data-search-title={post.data.title}>
         <span
           transition:name={`post-${slug}${currentLang ? `-${currentLang}` : ''}`}
           data-disable-theme-toggle-transition
         >
-          {post.data.title}
+          {post.data.displayTitle || post.data.title}
         </span>
       </h1>
+      {post.data.attribution && <p class="post-attribution">{post.data.attribution}</p>}
     </div>
 
     <!-- Date -->
     <div
       id="post-date"
-      class="mb-17.2 block c-primary font-time"
+      class="block c-primary font-time"
       transition:name={`time-${slug}${currentLang ? `-${currentLang}` : ''}`}
       data-disable-theme-toggle-transition
     >
       <PostDate
         date={post.data.published}
         updatedDate={post.data.updated}
-        minutes={remarkPluginFrontmatter.minutes}
       />
     </div>
     <!-- TOC -->
     {post.data.toc && <TOC headings={headings} />}
     <!-- Content -->
-    <div id="post-content">
+    <div id="post-content" data-pagefind-body>
       <Content />
-      <!-- Copyright -->
-      <div id="post-copyright" />
-      <!-- Tag List -->
-      {post.data.tags?.length > 0 && (
-        <div class="mt-12.6 uno-decorative-line" />
-        <TagList
-          tags={post.data.tags}
-          lang={currentLang}
-        />
-      )}
-      <!-- Comment -->
-      <Comment />
     </div>
+    <!-- Copyright -->
+    <div id="post-copyright" />
+    <!-- Tag List -->
+    {post.data.tags?.length > 0 && (
+      <div class="mt-12.6 uno-decorative-line" />
+      <TagList tags={post.data.tags} lang={currentLang} />
+    )}
+    <!-- Comment -->
+    <Comment />
   </article>
+  {related.length > 0 && (
+    <section class="related-posts" aria-labelledby="related-posts-heading">
+      <h2 id="related-posts-heading">이어 읽기</h2>
+      <ul>
+        {related.map(({ post: relatedPost, reason }) => relatedPost && (
+          <li>
+            <a href={getPostPath(relatedPost.data.abbrlink || relatedPost.id, currentLang)}>{relatedPost.data.displayTitle || relatedPost.data.title}</a>
+            <p>{reason}</p>
+          </li>
+        ))}
+      </ul>
+      {topic && <a class="related-topic-link" href={getLocalizedPath(`/topics/${topic.slug}/`, currentLang)}>{topic.title}의 모든 글 →</a>}
+    </section>
+  )}
 </Layout>

@@ -4,6 +4,14 @@ description: "GLIE의 구면 정규화, 작은 저장 코드, 후보 문서 복�
 categories: [research, ai]
 tags: [paper-review, information-retrieval, visual-document, late-interaction, compression]
 date: 2026-09-29
+updated: '2026-10-01'
+displayTitle: 'GLIE: 후보만 복원하는 문서 검색'
+attribution: Generative Late-Interaction Embeddings — Mohamed Eltahir 외
+related:
+  - slug: denseon-lateon-multilingual-retrieval
+    reason: 단일 벡터와 토큰별 표현의 검색 품질·비용을 비교합니다.
+  - slug: immutable-versions-through-rag-pipeline
+    reason: 검색 결과가 어떤 문서 버전을 인용하는지 이어서 확인합니다.
 ---
 
 이미지 문서 한 쪽을 검색하려고 약 1,000개의 벡터를 저장한다. 저장 공간을 줄이려고 네 개만 남기면, 질의와 맞는 표의 셀이나 그림 속 글자가 빠질 수 있다. **검색할 때는 네 개로 모든 쪽을 훑고, 추린 후보에서만 약 1,000개를 다시 만들어 점수를 매기면 어떨까?**

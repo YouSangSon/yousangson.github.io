@@ -4,6 +4,12 @@ description: Cloudflare가 1.1.1.1 DNS 캐시의 엔트리 구조를 바꿔 메�
 categories: [architecture, rust]
 tags: [cloudflare, dns, cache, rust, memory optimization, data structure]
 date: 2026-08-31
+updated: '2026-10-09'
+related:
+  - slug: flashattention-io-to-fp4-bottlenecks
+    reason: 한 비용을 줄인 뒤 남는 메모리·계산 병목을 따라갑니다.
+  - slug: upload-memory-admission-before-body
+    reason: 버퍼 크기와 동시 작업 수가 메모리 상한을 만드는 과정을 확인합니다.
 ---
 
 Cloudflare의 Sebastiaan Neuteboom은 [2026년 8월 27일 공개한 글](https://blog.cloudflare.com/dns-cache-memory-optimization-1111/)에서 자사 DNS 플랫폼이 **2,500억 개가 넘는 캐시 엔트리**를 보관한다고 설명했다. 이 규모에서는 엔트리마다 1바이트만 낭비해도 전체 시스템에서 250GB가 넘는 메모리를 사용하게 된다. 많은 항목을 저장하는 캐시를 설계할 때 엔트리 구조의 작은 변경이 전체 메모리와 처리 비용을 어떻게 바꾸는지 이 사례로 살펴볼 수 있다.

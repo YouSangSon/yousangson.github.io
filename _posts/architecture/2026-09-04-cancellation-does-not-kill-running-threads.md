@@ -5,6 +5,12 @@ categories: [architecture, concurrency]
 tags: [cancellation, asyncio, rust, tokio, kotlin, coroutine, mcp, concurrency]
 date: 2026-09-04
 mermaid: true
+updated: '2026-09-29'
+related:
+  - slug: virtual-threads-in-kotlin
+    reason: 가상 스레드와 코루틴의 실행 위치와 자원 수명을 비교합니다.
+  - slug: parser-cancellation-resource-ownership
+    reason: 작업 취소 뒤 임시파일과 처리 슬롯을 해제할 시점을 확인합니다.
 ---
 
 `task.cancel()`은 성공했다. 호출자는 곧바로 `CancelledError`를 받았다. 그런데 별도 스레드에서 시작한 작업은 잠시 뒤 정상적으로 끝났다.

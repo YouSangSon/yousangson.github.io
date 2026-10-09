@@ -12,8 +12,8 @@ interface Props {
 }
 
 // Props and Language
-const { postTitle, postDescription } = Astro.props
-const { currentLang } = getPageInfo(Astro.url.pathname)
+const { postTitle, postDescription, postSlug } = Astro.props
+const { currentLang, isPost } = getPageInfo(Astro.url.pathname)
 const currentUI = ui[currentLang as keyof typeof ui] ?? {}
 
 // Site Configuration
@@ -33,7 +33,7 @@ const siteDescription = i18nTitle ? currentUI.description : description
 const pageTitle = postTitle ? `${postTitle} | ${siteTitle}` : `${siteTitle} - ${siteSubtitle}`
 const pageDescription = postDescription || siteDescription
 const isNotFound = Astro.url.pathname === '/404/' || Astro.url.pathname === '/404.html'
-const pageImage = new URL(`${base}/icons/social.png`, Astro.site)
+const pageImage = new URL(postSlug ? `${base}/social/${postSlug}.png` : `${base}/icons/social.png`, Astro.site)
 ---
 
 <head>
@@ -62,11 +62,13 @@ const pageImage = new URL(`${base}/icons/social.png`, Astro.site)
 
 
 <!-- Open Graph -->
-<meta property="og:type" content={postTitle ? 'article' : 'website'} />
+<meta property="og:type" content={isPost ? 'article' : 'website'} />
 <meta property="og:url" content={Astro.url} />
 <meta property="og:title" content={pageTitle} />
 <meta property="og:description" content={pageDescription} />
 <meta property="og:image" content={pageImage} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
 <meta name="twitter:card" content="summary_large_image" />
 {twitterID && <meta name="twitter:site" content={twitterID} />}
 

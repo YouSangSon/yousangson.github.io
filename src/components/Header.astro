@@ -3,7 +3,7 @@ import { themeConfig } from '@/config'
 import { ui } from '@/i18n/ui'
 import { getPageInfo } from '@/utils/page'
 
-const { currentLang, getLocalizedPath, isHome } = getPageInfo(Astro.url.pathname)
+const { currentLang, getLocalizedPath, isHome, isPost } = getPageInfo(Astro.url.pathname)
 const { title, subtitle, i18nTitle } = themeConfig.site
 
 const currentUI = ui[currentLang as keyof typeof ui] ?? {}
@@ -14,7 +14,7 @@ const TitleTag = isHome ? 'h1' : 'div'
 ---
 
 <header class="site-header">
-  <p class="site-eyebrow">Engineering notes</p>
+  {!isPost && <p class="site-eyebrow">Engineering notes</p>}
   <TitleTag class="site-title">
     <a
       id="site-title-link"
@@ -25,5 +25,5 @@ const TitleTag = isHome ? 'h1' : 'div'
       {headerTitle}
     </a>
   </TitleTag>
-  {headerSubtitle && <p class="site-subtitle">{headerSubtitle}</p>}
+  {!isPost && headerSubtitle && <p class="site-subtitle">{headerSubtitle}</p>}
 </header>
