@@ -134,7 +134,7 @@ async function checkUrlsAndReferences() {
     check(root?.querySelectorAll('.related-posts li').length === related?.length, `${post}: missing related links`)
     if (source?.updated) {
       const updated = new Date(source.updated).toISOString().slice(0, 10)
-      check(root?.querySelector(`#post-date time[datetime="${updated}"]`)?.text.includes('수정'), `${post}: revision date was lost`)
+      check(root?.querySelectorAll(`#post-date time[datetime="${updated}"]`).some(time => time.text.includes('수정')), `${post}: revision date was lost`)
       check(updated >= new Date(source.date || path.basename(sourceFile!).slice(0, 10)).toISOString().slice(0, 10), `${post}: revision precedes publication`)
     }
     const image = root?.querySelector('meta[property="og:image"]')?.getAttribute('content')
