@@ -4,6 +4,7 @@ import type { Language } from '@/i18n/config'
 import { getCollection, render } from 'astro:content'
 import Comment from '@/components/Comment/Index.astro'
 import PostDate from '@/components/PostDate.astro'
+import PostViews from '@/components/PostViews.astro'
 import TagList from '@/components/TagList.astro'
 import BackButton from '@/components/Widgets/BackButton.astro'
 import TOC from '@/components/Widgets/TOC.astro'
@@ -122,6 +123,7 @@ const related = post.data.related.map(({ slug: relatedSlug, reason }) => ({
         date={post.data.published}
         updatedDate={post.data.updated}
       />
+      <PostViews path={getPostPath(slug, currentLang)} count />
     </div>
     <!-- TOC -->
     {post.data.toc && <TOC headings={headings} />}

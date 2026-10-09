@@ -1,6 +1,7 @@
 ---
 import PostDate from '@/components/PostDate.astro'
 import PostList from '@/components/PostList.astro'
+import PostViews from '@/components/PostViews.astro'
 import TopicList from '@/components/TopicList.astro'
 import { allLocales } from '@/config'
 import { getLangFromLocale, getLangRouteParam } from '@/i18n/lang'
@@ -35,7 +36,7 @@ const companion = allPosts.find(post => (post.data.abbrlink || post.id) === comp
         <h2 id="featured-heading"><a href={getPostPath(featured.data.abbrlink || featured.id, currentLang)}>{featured.data.displayTitle || featured.data.title}</a></h2>
         {featured.data.attribution && <p class="post-attribution">{featured.data.attribution}</p>}
         <p class="featured-description">{getPostDescription(featured, 'list')}</p>
-        <div class="post-list-meta"><PostDate date={featured.data.published} updatedDate={featured.data.updated} /></div>
+        <div class="post-list-meta"><PostDate date={featured.data.published} updatedDate={featured.data.updated} /><PostViews path={getPostPath(featured.data.abbrlink || featured.id, currentLang)} /></div>
         <a class="featured-read" href={getPostPath(featured.data.abbrlink || featured.id, currentLang)}>글 읽기 <span aria-hidden="true">↗</span></a>
       </div>
       <div class="editorial-art" aria-hidden="true">

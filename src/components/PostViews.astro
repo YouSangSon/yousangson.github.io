@@ -1,0 +1,94 @@
+---
+interface Props {
+  path: string
+  count?: boolean
+}
+
+const { path, count = false } = Astro.props
+---
+
+<span
+  class="page-views"
+  data-page-views
+  data-path={path}
+  data-count={count ? 'true' : undefined}
+  data-site-origin={Astro.site?.origin}
+  aria-live="polite"
+  hidden
+>조회 <span data-view-value></span>회</span>
+
+<script>
+  const loaded = new WeakSet<HTMLElement>()
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting || document.visibilityState !== 'visible')
+        continue
+      observer.unobserve(entry.target)
+      for (const element of Array.from(entry.target.querySelectorAll<HTMLElement>('[data-page-views]'))) {
+        if (loaded.has(element))
+          continue
+        loaded.add(element)
+        void loadViews(element)
+      }
+    }
+  })
+
+  async function loadViews(element: HTMLElement) {
+    try {
+      const url = new URL(element.dataset.path!, element.dataset.siteOrigin)
+      url.search = ''
+      url.hash = ''
+      const count = element.dataset.count === 'true' && !navigator.webdriver
+      const response = await fetch('https://busuanzi.9420.ltd/api', {
+        method: count ? 'POST' : 'GET',
+        headers: { 'x-bsz-referer': url.href },
+        credentials: 'omit',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+        signal: AbortSignal.timeout(5000),
+      })
+      if (!response.ok)
+        return
+      const result = await response.json()
+      const views = result.data?.page_pv
+      if (result.success !== true || !Number.isSafeInteger(views) || views < 0 || !element.isConnected)
+        return
+      element.querySelector('[data-view-value]')!.textContent = new Intl.NumberFormat('ko-KR').format(views)
+      element.hidden = false
+    }
+    catch {
+      // An unavailable count must not look like zero or interrupt reading.
+    }
+  }
+
+  function observeViews() {
+    observer.disconnect()
+    const optOut = navigator.doNotTrack === '1' || ('globalPrivacyControl' in navigator && navigator.globalPrivacyControl === true)
+    for (const element of Array.from(document.querySelectorAll<HTMLElement>('[data-page-views]'))) {
+      if (optOut || location.origin !== element.dataset.siteOrigin) {
+        element.hidden = true
+        continue
+      }
+      if (loaded.has(element))
+        continue
+      if (element.dataset.count === 'true') {
+        if (document.visibilityState === 'visible') {
+          loaded.add(element)
+          void loadViews(element)
+        }
+      }
+      else {
+        observer.observe(element.parentElement!)
+      }
+    }
+  }
+
+  observeViews()
+  document.addEventListener('astro:page-load', observeViews)
+  document.addEventListener('visibilitychange', observeViews)
+</script>
+
+<style>
+  .page-views { margin-left: 0.75rem; white-space: nowrap; }
+  .page-views[hidden] { display: none; }
+</style>

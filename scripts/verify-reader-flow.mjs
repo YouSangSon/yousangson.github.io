@@ -4,6 +4,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { preview } from 'astro'
 import { chromium } from 'playwright'
+import { verifyPostViews } from './verify-post-views.mjs'
 
 let server
 let browser
@@ -18,6 +19,7 @@ try {
   if (artifactDir)
     await mkdir(artifactDir, { recursive: true })
   browser = await chromium.launch()
+  await verifyPostViews(browser, base, artifactDir)
   const context = await browser.newContext({ colorScheme: 'no-preference', reducedMotion: 'reduce' })
   const page = await context.newPage()
   page.setDefaultTimeout(15000)

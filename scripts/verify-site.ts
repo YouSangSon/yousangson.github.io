@@ -122,6 +122,9 @@ async function checkUrlsAndReferences() {
     check(!content?.querySelector('.related-posts, #post-date, #toc-container'), `${post}: display metadata entered the search body`)
     check(!root?.querySelector('main')?.text.includes('읽는 데'), `${post}: reading time returned`)
     const slug = post.split('/')[1]
+    const views = root?.querySelector('[data-page-views]')
+    check(views?.getAttribute('data-path') === `/posts/${slug}/` && views.getAttribute('data-count') === 'true', `${post}: missing article view counter`)
+    check(!content?.querySelector('[data-page-views]'), `${post}: view count entered the search body`)
     const sourceFile = sourcePosts.find(file => file.endsWith(`-${slug}.md`))
     const source = sourceFile ? matter(await fs.readFile(sourceFile, 'utf8')).data : undefined
     const related = source?.related as { slug: string, reason: string }[] | undefined

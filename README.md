@@ -14,7 +14,7 @@ pnpm preview
 
 Node.js 24와 pnpm 10.33을 사용합니다. 검색은 `pnpm build` 이후 `pnpm preview`에서 확인합니다.
 
-`pnpm verify:reader`는 빌드 결과를 임시 포트에서 열고 검색 → 글 → 뒤로 가기, 검색어 공유·새로고침, 모바일 읽기와 관련 글을 Chromium으로 검사합니다. 최초 실행에는 `pnpm exec playwright install chromium`이 필요합니다. 공유 카드의 한글 렌더링은 시스템 글꼴을 사용합니다. Linux에서는 `fonts-noto-cjk`를 설치하며 배포 workflow도 같은 글꼴을 준비합니다.
+`pnpm verify:reader`는 빌드 결과를 임시 포트에서 열고 검색 → 글 → 뒤로 가기, 검색어 공유·새로고침, 모바일 읽기와 관련 글을 Chromium으로 검사합니다. 조회수 검사는 집계 API를 가로채 모의 응답으로 집계·읽기 요청, 바로가기·페이지 이동, 추적 거부와 오류 처리를 확인하며 실서비스 숫자를 올리지 않습니다. 최초 실행에는 `pnpm exec playwright install chromium`이 필요합니다. 공유 카드의 한글 렌더링은 시스템 글꼴을 사용합니다. Linux에서는 `fonts-noto-cjk`를 설치하며 배포 workflow도 같은 글꼴을 준비합니다.
 
 원문의 `updated`는 실제 본문을 보완한 날짜입니다. 최초 `date`는 유지합니다. 논문 글의 `displayTitle`·`attribution`은 읽기용 제목과 출처 표시이며 원래 `title`은 검색·공유 메타데이터에 보존합니다. `related`에는 연결할 글의 slug와 함께 읽는 이유를 2~3개 적습니다. 빌드가 글별 1200×630px 공유 이미지를 생성합니다.
 
@@ -23,5 +23,7 @@ Node.js 24와 pnpm 10.33을 사용합니다. 검색은 `pnpm build` 이후 `pnpm
 글을 추가하면 `src/utils/topics.ts`에서 독자가 찾을 대표 분야 한 곳에 배치합니다. `pnpm verify`가 미분류·중복 분류와 카테고리별 글 수·요약을 검사합니다. 의도적으로 삭제한 글은 `scripts/retired-posts.json`에 기록하며, 기존 주소 검사의 보존 목록에서도 해당 주소만 제외합니다. 이 목록의 글이 다시 빌드되면 검사가 실패합니다.
 
 `master`의 GitHub Actions가 검사와 빌드를 통과한 뒤 GitHub Pages로 배포합니다.
+
+조회수는 계정 없이 사용하는 [Busuanzi 집계 API](https://github.com/soxft/busuanzi/wiki/api)로 2026-10-09부터 누적합니다. 실제 공개 글 화면은 POST로 조회수를 올리고, 홈·분야·아카이브 목록은 GET으로 기존 숫자만 읽습니다. 주소는 canonical 글 경로로 통일하며 검색어·query·fragment와 쿠키는 보내지 않습니다. 브라우저 추적 거부(DNT/GPC)를 존중하고, 자동 브라우저는 읽기 요청만 수행합니다. 로컬 미리보기에서는 요청하지 않습니다. 서버가 유효한 숫자를 주지 않으면 조회수를 숨기며 0으로 대체하지 않습니다. 숫자는 페이지 조회 횟수이며 실제 읽은 사람 수가 아닙니다. 이 집계는 분석 계정 ID와 독립적으로 동작합니다.
 
 테마 코드는 Retypeset `a636b6d393be714cab52d3fc4baddd3f3905f701`을 기반으로 합니다. MIT 라이선스와 원저작자 표기는 [LICENSE](LICENSE)에 보존합니다. 이 표기는 블로그 글의 별도 재배포 허가를 의미하지 않습니다.
