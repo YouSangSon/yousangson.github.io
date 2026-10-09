@@ -74,13 +74,16 @@ try {
       await page.getByRole('button', { name: '밝은 테마와 어두운 테마 전환' }).click()
     for (const width of [320, 390, 768, 1280]) {
       await page.setViewportSize({ width, height: 900 })
-      await page.evaluate(() => document.fonts.ready)
+      await page.evaluate(async () => {
+        await document.fonts.ready
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      })
       const geometry = await page.evaluate(() => {
         const paragraph = document.querySelector('#post-content > p')
         const lineHeight = Number.parseFloat(getComputedStyle(paragraph).lineHeight)
         return { top: paragraph.getBoundingClientRect().top, lineHeight, viewport: innerHeight, pageWidth: document.documentElement.scrollWidth }
       })
-      assert(geometry.top + 2 * geometry.lineHeight < geometry.viewport, 'first screen does not show two lines of the introduction')
+      assert(geometry.top + 2 * geometry.lineHeight < geometry.viewport, `first screen does not show two lines of the introduction: ${theme}/${width}px ${JSON.stringify(geometry)}`)
       assert(geometry.pageWidth <= width + 1, `page overflows at ${width}px`)
       assert.match(await page.locator('.post-attribution').textContent(), /Tri Dao.*Ted Zadouri.*Robert Hu/)
       assert(await page.locator('.related-posts li').count() >= 2)
