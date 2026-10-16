@@ -75,6 +75,7 @@ export const topics = [
       'file-upload-concurrency-control',
       'restore-preflight-and-toctou-boundary',
       'upload-memory-admission-before-body',
+      'multipart-file-and-body-limits',
     ],
   },
   {
@@ -100,6 +101,8 @@ export const topics = [
       'gitlab-ci-kubernetes-networkpolicy-rbac-debugging',
       'jib',
       'diagnostic-capture-status-and-trusted-identity',
+      'database-index-preparation-and-startup',
+      'git-worktree-runtime-inputs',
     ],
   },
 ]
