@@ -76,6 +76,8 @@ export const topics = [
       'restore-preflight-and-toctou-boundary',
       'upload-memory-admission-before-body',
       'multipart-file-and-body-limits',
+      'rfc3339nano-sort-and-cursor',
+      's3-list-lookahead-pagination',
     ],
   },
   {
@@ -103,6 +105,7 @@ export const topics = [
       'diagnostic-capture-status-and-trusted-identity',
       'database-index-preparation-and-startup',
       'git-worktree-runtime-inputs',
+      'go-binary-sbom-artifact-identity',
     ],
   },
 ]
