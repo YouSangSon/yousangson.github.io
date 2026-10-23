@@ -1,6 +1,19 @@
 // Reader-facing topics; each published post belongs to exactly one topic.
 export const topics = [
   {
+    slug: 'project-stories',
+    startWith: 'akasha-memory-value',
+    title: '개인 프로젝트 개발기',
+    description: '직접 만드는 도구와 서비스에서 선택한 구조, 확인한 결과와 남은 과제.',
+    posts: [
+      'akasha-memory-value',
+      'parallax-change-impact-evidence',
+      'omni-folio-ledger-and-research-boundary',
+      'mimir-data-source-lifecycle',
+      'nebula-app-runtime-data-lifetimes',
+    ],
+  },
+  {
     slug: 'research-reviews',
     startWith: 'glie-visual-document-retrieval',
     title: '논문·프로젝트 리뷰',
