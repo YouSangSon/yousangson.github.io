@@ -6,6 +6,7 @@ export const topics = [
     title: '개인 프로젝트 개발기',
     description: '직접 만드는 도구와 서비스에서 선택한 구조, 확인한 결과와 남은 과제.',
     posts: [
+      'akasha-retrieval-qualification',
       'akasha-memory-value',
       'parallax-change-impact-evidence',
       'omni-folio-ledger-and-research-boundary',
@@ -19,6 +20,7 @@ export const topics = [
     title: '논문·프로젝트 리뷰',
     description: '컴퓨터 과학의 고전과 최근 AI 연구를 원리, 실험 근거, 적용 한계로 읽는 글.',
     posts: [
+      'chandy-lamport-consistent-snapshots',
       'glie-visual-document-retrieval',
       'denseon-lateon-multilingual-retrieval',
       'incr-reexecution-effects',
